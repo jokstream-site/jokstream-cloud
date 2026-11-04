@@ -131,7 +131,7 @@ const server = http.createServer(async (req, res) => {
     if (requestUrl.pathname === "/public/player_api.php") {
       if (!publicAuthorized(requestUrl, req)) return json(res, 401, { error: "Test session expired. Refresh the page." });
       const b = upstreamBase();
-      b.pathname = b.pathname.replace(/\\/$/, "") + "/player_api.php";
+      b.pathname = b.pathname.replace(/\/$/, "") + "/player_api.php";
       b.search = "";
       for (const [key, value] of requestUrl.searchParams) if (key !== "token") b.searchParams.set(key, value);
       b.searchParams.set("username", upstreamUser);
@@ -167,7 +167,7 @@ const server = http.createServer(async (req, res) => {
     const publicParts = requestUrl.pathname.split("/").filter(Boolean);
     if (publicParts.length === 3 && publicParts[0] === "public" && ["live", "movie", "series"].includes(publicParts[1])) {
       if (!publicAuthorized(requestUrl, req)) return json(res, 401, { error: "Test session expired. Refresh the page." });
-      const id = publicParts[2].replace(/\\.(m3u8|ts|mp4)$/i, "");
+      const id = publicParts[2].replace(/\.(m3u8|ts|mp4)$/i, "");
       const target = sourceUrl(publicParts[1], id);
       const upstream = await safeFetch(target, req.headers.range ? { range: req.headers.range } : {});
       const ct = (upstream.headers.get("content-type") || "").toLowerCase();
