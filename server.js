@@ -39,7 +39,8 @@ function sameSecret(a, b) {
   const bb = Buffer.from(String(b || ""));
   return aa.length === bb.length && timingSafeEqual(aa, bb);
 }
-function authorized(url, pathParts = []) {
+function authorized(url, pathParts = [], req = null) {
+  if (req && publicAuthorized(url, req)) return true;
   const u = url.searchParams.get("username") || pathParts[0] || "";
   const p = url.searchParams.get("password") || pathParts[1] || "";
   return !!clientUser && !!clientPass && sameSecret(u, clientUser) && sameSecret(p, clientPass);
