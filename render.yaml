@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: jokstream-cloud
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: XTREAM_BASE_URL
+        sync: false
+      - key: XTREAM_USERNAME
+        sync: false
+      - key: XTREAM_PASSWORD
+        sync: false
+      - key: JOKSTREAM_USERNAME
+        sync: false
+      - key: JOKSTREAM_PASSWORD
+        sync: false
+      - key: XTREAM_ALLOWED_HOSTS
+        sync: false
