@@ -79,8 +79,15 @@ function sourceUrl(kind, id, extension = "") {
 }
 function proxyUrl(reqUrl, target) {
   const out = new URL("/proxy", reqUrl);
-  out.searchParams.set("username", clientUser);
-  out.searchParams.set("password", clientPass);
+  // Public playback manifests must carry the short-lived session token to
+  // every child playlist/segment request. Never put provider credentials in
+  // browser-visible URLs.
+  const token = reqUrl.searchParams.get("token");
+  if (token) out.searchParams.set("token", token);
+  else if (clientUser && clientPass) {
+    out.searchParams.set("username", clientUser);
+    out.searchParams.set("password", clientPass);
+  }
   out.searchParams.set("url", target.toString());
   return out.pathname + out.search;
 }
