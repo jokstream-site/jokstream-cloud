@@ -148,7 +148,7 @@ const server = http.createServer(async (req, res) => {
       return pipeResponse(await safeFetch(b, { accept: req.headers.accept || "application/json" }), res, req);
     }
     if (requestUrl.pathname === "/proxy") {
-      if (!authorized(requestUrl)) return json(res, 401, { error: "Invalid JokStream proxy credentials" });
+      if (!authorized(requestUrl, [], req)) return json(res, 401, { error: "Invalid or expired test session" });
       const target = new URL(requestUrl.searchParams.get("url") || "");
       if (!allowed(target)) return json(res, 403, { error: "Upstream host is not allowlisted" });
       const h = {};
