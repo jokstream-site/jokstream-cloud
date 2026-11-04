@@ -91,6 +91,15 @@ async function pipeResponse(upstream, res, req) {
 }
 const server = http.createServer(async (req, res) => {
   const requestUrl = new URL(req.url, "http://" + (req.headers.host || "localhost"));
+  // Allow the Netlify-hosted frontend to call this API from the browser.
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Range, Accept, Authorization");
+  res.setHeader("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges");
+  if (req.method === "OPTIONS") {
+    res.writeHead(204);
+    return res.end();
+  }
   try {
     if (requestUrl.pathname === "/health") return json(res, 200, { ok: true, service: "jokstream-cloud", configured: !!(baseRaw && upstreamUser && upstreamPass && clientUser && clientPass) });
     if (requestUrl.pathname === "/") return json(res, 200, { service: "JokStream Cloud", health: "/health", api: "/player_api.php", note: "Authorized-content proxy; configure credentials in Render environment." });
