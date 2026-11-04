@@ -12,7 +12,7 @@ const publicSessionSecret = randomBytes(32);
 const sessionRequests = new Map();
 function issuePublicToken(ip) {
   const now = Date.now(), recent = (sessionRequests.get(ip) || []).filter(t => now - t < 3600000);
-  if (recent.length >= 5) return null;
+  if (recent.length >= 60) return null;
   recent.push(now); sessionRequests.set(ip, recent);
   const payload = Buffer.from(JSON.stringify({ ip, exp: now + 2 * 60 * 60 * 1000 })).toString("base64url");
   return payload + "." + createHmac("sha256", publicSessionSecret).update(payload).digest("base64url");
@@ -134,7 +134,7 @@ const server = http.createServer(async (req, res) => {
     if (requestUrl.pathname === "/") return json(res, 200, { service: "JokStream Cloud", health: "/health", api: "/player_api.php", note: "Authorized-content proxy; configure credentials in Render environment." });
     if (requestUrl.pathname === "/public/session") {
       const token = issuePublicToken(requestIp(req));
-      if (!token) return json(res, 429, { error: "Temporary test limit reached. Try again later." });
+      if (!token) { res.setHeader("Retry-After", "3600"); return json(res, 429, { error: "Session request limit reached for this IP. Please try again later." }); }
       return json(res, 200, { ok: true, token, expires_in: 7200 });
     }
     if (requestUrl.pathname === "/public/player_api.php") {
