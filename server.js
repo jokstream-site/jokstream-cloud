@@ -121,9 +121,9 @@ const server = http.createServer(async (req, res) => {
       return pipeResponse(upstream, res, req);
     }
     const parts = requestUrl.pathname.split("/").filter(Boolean);
-    if (parts.length === 3 && ["live", "movie", "series"].includes(parts[0])) {
+    if (parts.length === 4 && ["live", "movie", "series"].includes(parts[0])) {
       if (!authorized(requestUrl, parts.slice(1, 3))) return json(res, 401, { error: "Invalid JokStream proxy credentials" });
-      const target = sourceUrl(parts[0], parts[2]);
+      const target = sourceUrl(parts[0], parts[3]);
       const h = {};
       if (req.headers.range) h.range = req.headers.range;
       if (req.headers["if-range"]) h["if-range"] = req.headers["if-range"];
