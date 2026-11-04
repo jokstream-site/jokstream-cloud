@@ -1,6 +1,6 @@
 const http = require("node:http");
 const { URL } = require("node:url");
-const { timingSafeEqual } = require("node:crypto");
+const { timingSafeEqual, createHmac, randomBytes } = require("node:crypto");
 
 const PORT = Number(process.env.PORT || 3000);
 const baseRaw = process.env.XTREAM_BASE_URL || "";
@@ -8,6 +8,25 @@ const upstreamUser = process.env.XTREAM_USERNAME || "";
 const upstreamPass = process.env.XTREAM_PASSWORD || "";
 const clientUser = process.env.JOKSTREAM_USERNAME || "";
 const clientPass = process.env.JOKSTREAM_PASSWORD || "";
+const publicSessionSecret = randomBytes(32);
+const sessionRequests = new Map();
+function issuePublicToken(ip) {
+  const now = Date.now(), recent = (sessionRequests.get(ip) || []).filter(t => now - t < 3600000);
+  if (recent.length >= 5) return null;
+  recent.push(now); sessionRequests.set(ip, recent);
+  const payload = Buffer.from(JSON.stringify({ ip, exp: now + 20 * 60 * 1000 })).toString("base64url");
+  return payload + "." + createHmac("sha256", publicSessionSecret).update(payload).digest("base64url");
+}
+function requestIp(req) { return (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").toString().split(",")[0].trim(); }
+function publicAuthorized(url, req) {
+  const token = url.searchParams.get("token") || "";
+  const [payload, sig] = token.split(".");
+  if (!payload || !sig) return false;
+  const expected = createHmac("sha256", publicSessionSecret).update(payload).digest();
+  const actual = Buffer.from(sig, "base64url");
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return false;
+  try { const data = JSON.parse(Buffer.from(payload, "base64url").toString()); return data.ip === requestIp(req) && data.exp > Date.now(); } catch { return false; }
+}
 const allowedHosts = new Set(
   [baseRaw, ...(process.env.XTREAM_ALLOWED_HOSTS || "").split(",")]
     .map(v => v.trim()).filter(Boolean)
@@ -103,9 +122,24 @@ const server = http.createServer(async (req, res) => {
   try {
     if (requestUrl.pathname === "/health") return json(res, 200, { ok: true, service: "jokstream-cloud", configured: !!(baseRaw && upstreamUser && upstreamPass && clientUser && clientPass) });
     if (requestUrl.pathname === "/") return json(res, 200, { service: "JokStream Cloud", health: "/health", api: "/player_api.php", note: "Authorized-content proxy; configure credentials in Render environment." });
+    if (requestUrl.pathname === "/public/session") {
+      const token = issuePublicToken(requestIp(req));
+      if (!token) return json(res, 429, { error: "Temporary test limit reached. Try again later." });
+      return json(res, 200, { ok: true, token, expires_in: 1200 });
+    }
+    if (requestUrl.pathname === "/public/player_api.php") {
+      if (!publicAuthorized(requestUrl, req)) return json(res, 401, { error: "Test session expired. Refresh the page." });
+      const b = upstreamBase();
+      b.pathname = b.pathname.replace(/\\/$/, "") + "/player_api.php";
+      b.search = "";
+      for (const [key, value] of requestUrl.searchParams) if (key !== "token") b.searchParams.set(key, value);
+      b.searchParams.set("username", upstreamUser);
+      b.searchParams.set("password", upstreamPass);
+      return pipeResponse(await safeFetch(b, { accept: "application/json" }), res, req);
+    }
     if (req.method !== "GET" && req.method !== "HEAD") return json(res, 405, { error: "Method not allowed" });
     if (requestUrl.pathname === "/player_api.php") {
-      if (!authorized(requestUrl)) return json(res, 401, { error: "Invalid JokStream proxy credentials" });
+      if (!authorized(requestUrl, [], req)) return json(res, 401, { error: "Invalid or expired test session" });
       const b = upstreamBase();
       b.pathname = b.pathname.replace(/\/$/, "") + "/player_api.php";
       b.search = requestUrl.search;
@@ -129,9 +163,23 @@ const server = http.createServer(async (req, res) => {
       }
       return pipeResponse(upstream, res, req);
     }
+    const publicParts = requestUrl.pathname.split("/").filter(Boolean);
+    if (publicParts.length === 3 && publicParts[0] === "public" && ["live", "movie", "series"].includes(publicParts[1])) {
+      if (!publicAuthorized(requestUrl, req)) return json(res, 401, { error: "Test session expired. Refresh the page." });
+      const id = publicParts[2].replace(/\\.(m3u8|ts|mp4)$/i, "");
+      const target = sourceUrl(publicParts[1], id);
+      const upstream = await safeFetch(target, req.headers.range ? { range: req.headers.range } : {});
+      const ct = (upstream.headers.get("content-type") || "").toLowerCase();
+      if (ct.includes("mpegurl") || target.pathname.toLowerCase().endsWith(".m3u8")) {
+        const rewritten = rewritePlaylist(await upstream.text(), target, requestUrl);
+        res.writeHead(upstream.status, { "content-type": "application/vnd.apple.mpegurl", "cache-control": "no-store", "access-control-allow-origin": "*" });
+        return res.end(rewritten);
+      }
+      return pipeResponse(upstream, res, req);
+    }
     const parts = requestUrl.pathname.split("/").filter(Boolean);
     if (parts.length === 4 && ["live", "movie", "series"].includes(parts[0])) {
-      if (!authorized(requestUrl, parts.slice(1, 3))) return json(res, 401, { error: "Invalid JokStream proxy credentials" });
+      if (!authorized(requestUrl, parts.slice(1, 3), req)) return json(res, 401, { error: "Invalid or expired test session" });
       const target = sourceUrl(parts[0], parts[3]);
       const h = {};
       if (req.headers.range) h.range = req.headers.range;
