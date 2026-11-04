@@ -1,0 +1,8 @@
+{
+  "name": "jokstream-cloud",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Authorized Xtream-compatible API and media proxy for JokStream",
+  "engines": { "node": ">=20" },
+  "scripts": { "start": "node server.js" }
+}
