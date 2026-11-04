@@ -70,10 +70,10 @@ async function safeFetch(initialUrl, headers = {}) {
   }
   throw new Error("Too many upstream redirects");
 }
-function sourceUrl(kind, id) {
+function sourceUrl(kind, id, extension = "") {
   const b = upstreamBase();
   b.pathname = b.pathname.replace(/\/$/, "") + "/" + kind + "/" +
-    encodeURIComponent(upstreamUser) + "/" + encodeURIComponent(upstreamPass) + "/" + encodeURIComponent(id);
+    encodeURIComponent(upstreamUser) + "/" + encodeURIComponent(upstreamPass) + "/" + encodeURIComponent(id) + extension;
   b.search = "";
   return b;
 }
@@ -167,8 +167,10 @@ const server = http.createServer(async (req, res) => {
     const publicParts = requestUrl.pathname.split("/").filter(Boolean);
     if (publicParts.length === 3 && publicParts[0] === "public" && ["live", "movie", "series"].includes(publicParts[1])) {
       if (!publicAuthorized(requestUrl, req)) return json(res, 401, { error: "Test session expired. Refresh the page." });
-      const id = publicParts[2].replace(/\.(m3u8|ts|mp4)$/i, "");
-      const target = sourceUrl(publicParts[1], id);
+      const extMatch = publicParts[2].match(/\.(m3u8|ts|mp4|mkv|avi)$/i);
+      const extension = extMatch ? extMatch[0] : ".m3u8";
+      const id = publicParts[2].replace(/\.(m3u8|ts|mp4|mkv|avi)$/i, "");
+      const target = sourceUrl(publicParts[1], id, extension);
       const upstream = await safeFetch(target, req.headers.range ? { range: req.headers.range } : {});
       const ct = (upstream.headers.get("content-type") || "").toLowerCase();
       if (ct.includes("mpegurl") || target.pathname.toLowerCase().endsWith(".m3u8")) {
