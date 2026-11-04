@@ -106,8 +106,10 @@ async function pipeResponse(upstream, res, req) {
   headers["cache-control"] = "no-store";
   res.writeHead(upstream.status, headers);
   if (req.method === "HEAD" || !upstream.body) return res.end();
-  const { Readable } = require("node:stream");
-  Readable.fromWeb(upstream.body).pipe(res);
+  const { Readable, pipeline } = require("node:stream");
+  pipeline(Readable.fromWeb(upstream.body), res, err => {
+    if (err) console.error("upstream_stream_error:", err.message);
+  });
 }
 const server = http.createServer(async (req, res) => {
   const requestUrl = new URL(req.url, "http://" + (req.headers.host || "localhost"));
