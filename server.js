@@ -61,11 +61,27 @@ function upstreamBase() {
 function allowed(url) {
   return ["http:", "https:"].includes(url.protocol) && allowedHosts.has(url.hostname.toLowerCase());
 }
+function redirectAllowed(url) {
+  if (allowed(url)) return true;
+  const base = upstreamBase();
+  const host = url.hostname.toLowerCase();
+  const provider = base.hostname.toLowerCase();
+  return host === provider || host.endsWith("." + provider);
+}
 async function safeFetch(initialUrl, headers = {}) {
   let current = new URL(initialUrl);
   for (let i = 0; i < 6; i++) {
-    if (!allowed(current)) throw new Error("Upstream host is not allowlisted. Add its hostname to XTREAM_ALLOWED_HOSTS if it belongs to your provider.");
-    const response = await fetch(current, { headers, redirect: "manual" });
+    if (!allowed(current) && !(i > 0 && redirectAllowed(current))) {
+      throw new Error("Upstream host is not allowlisted: " + current.hostname);
+    }
+    const response = await fetch(current, {
+      headers: {
+        "user-agent": "JokStream/1.0",
+        "accept": "*/*",
+        ...headers
+      },
+      redirect: "manual"
+    });
     if (![301, 302, 303, 307, 308].includes(response.status)) return response;
     const location = response.headers.get("location");
     if (!location) return response;
@@ -97,7 +113,9 @@ function proxyUrl(reqUrl, target) {
 function rewritePlaylist(text, manifestUrl, reqUrl) {
   const rewriteUri = raw => {
     const resolved = new URL(raw, manifestUrl);
-    if (!allowed(resolved)) throw new Error("Playlist references a host not in XTREAM_ALLOWED_HOSTS");
+    if (!allowed(resolved) && !redirectAllowed(resolved)) {
+      throw new Error("Playlist references an unapproved host: " + resolved.hostname);
+    }
     return proxyUrl(reqUrl, resolved);
   };
   return text.split(/\r?\n/).map(line => {
@@ -114,12 +132,20 @@ async function pipeResponse(upstream, res, req) {
   }
   headers["access-control-allow-origin"] = "*";
   headers["cache-control"] = "no-store";
+  if (res.destroyed || res.writableEnded) return;
   res.writeHead(upstream.status, headers);
   if (req.method === "HEAD" || !upstream.body) return res.end();
-  const { Readable, pipeline } = require("node:stream");
-  pipeline(Readable.fromWeb(upstream.body), res, err => {
-    if (err) console.error("upstream_stream_error:", err.message);
-  });
+  const { Readable } = require("node:stream");
+  try {
+    for await (const chunk of Readable.fromWeb(upstream.body)) {
+      if (res.destroyed || res.writableEnded) break;
+      if (!res.write(chunk)) await new Promise(resolve => res.once("drain", resolve));
+    }
+  } catch (err) {
+    if (!res.destroyed && !res.writableEnded) console.error("upstream_stream_error:", err.message);
+  } finally {
+    if (!res.destroyed && !res.writableEnded) res.end();
+  }
 }
 const server = http.createServer(async (req, res) => {
   const requestUrl = new URL(req.url, "http://" + (req.headers.host || "localhost"));
@@ -198,7 +224,7 @@ const server = http.createServer(async (req, res) => {
     if (requestUrl.pathname === "/proxy") {
       if (!authorized(requestUrl, [], req)) return json(res, 401, { error: "Invalid or expired test session" });
       const target = new URL(requestUrl.searchParams.get("url") || "");
-      if (!allowed(target)) return json(res, 403, { error: "Upstream host is not allowlisted" });
+      if (!allowed(target) && !redirectAllowed(target)) return json(res, 403, { error: "Upstream host is not allowlisted" });
       const h = {};
       if (req.headers.range) h.range = req.headers.range;
       if (req.headers["if-range"]) h["if-range"] = req.headers["if-range"];
