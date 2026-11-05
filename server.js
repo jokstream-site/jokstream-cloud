@@ -70,16 +70,22 @@ function redirectAllowed(url) {
 }
 async function safeFetch(initialUrl, headers = {}) {
   let current = new URL(initialUrl);
+  const base = upstreamBase();
+  const commonHeaders = {
+    "user-agent": "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 Chrome/131.0 Mobile Safari/537.36",
+    "accept": "*/*",
+    "accept-language": "en-US,en;q=0.9",
+    "cache-control": "no-cache",
+    "pragma": "no-cache",
+    "referer": base.origin + "/",
+    "origin": base.origin
+  };
   for (let i = 0; i < 6; i++) {
     if (!allowed(current) && !(i > 0 && redirectAllowed(current))) {
       throw new Error("Upstream host is not allowlisted: " + current.hostname);
     }
     const response = await fetch(current, {
-      headers: {
-        "user-agent": "JokStream/1.0",
-        "accept": "*/*",
-        ...headers
-      },
+      headers: { ...commonHeaders, ...headers },
       redirect: "manual"
     });
     if (![301, 302, 303, 307, 308].includes(response.status)) return response;
@@ -200,6 +206,18 @@ const server = http.createServer(async (req, res) => {
       }
       const items = entry.items.slice(rawOffset, rawOffset + rawLimit);
       return json(res, 200, { items, total: entry.items.length, offset: rawOffset, limit: rawLimit, hasMore: rawOffset + items.length < entry.items.length });
+    }
+    if (requestUrl.pathname === "/public/live-url") {
+      if (!publicAuthorized(requestUrl, req)) return json(res, 401, { error: "Test session expired. Refresh the page." });
+      const id = requestUrl.searchParams.get("id") || "";
+      if (!/^\d+$/.test(id)) return json(res, 400, { error: "Invalid live stream id" });
+      const format = (requestUrl.searchParams.get("format") || "m3u8").toLowerCase();
+      const extension = format === "ts" ? ".ts" : ".m3u8";
+      const target = sourceUrl("live", id, extension);
+      const upstream = await safeFetch(target, { accept: "application/vnd.apple.mpegurl,application/octet-stream,*/*" });
+      if (!upstream.ok) return json(res, upstream.status, { error: "Live source returned HTTP " + upstream.status });
+      try { upstream.body && upstream.body.cancel(); } catch {}
+      return json(res, 200, { ok: true, format, url: proxyUrl(requestUrl, target) });
     }
     if (requestUrl.pathname === "/public/player_api.php") {
       if (!publicAuthorized(requestUrl, req)) return json(res, 401, { error: "Test session expired. Refresh the page." });
