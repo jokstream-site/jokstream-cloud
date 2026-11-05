@@ -66,7 +66,7 @@ function setHealth(ok,msg){$('healthDot').className='dot '+(ok?'good':'bad');$('
 async function load(){showNotice('جارٍ إنشاء جلسة الاتصال...');setHealth(false,'جارٍ الاتصال');try{await session();setHealth(true,'تم الاتصال بالخادم');await tab('live');$('lastUpdate').textContent=new Date().toLocaleTimeString('ar')}catch(e){setHealth(false,'تعذر الاتصال');showNotice('تعذر تحميل البيانات: '+e.message+' — أعد المحاولة بعد قليل.',true);$('catalog').innerHTML='';$('empty').hidden=true}}
 function resetSubtitles(){const s=$('subtitleSelect');s.innerHTML='<option value="-1">إيقاف / غير متاحة</option>'}
 function setSubtitleOptions(){const s=$('subtitleSelect');resetSubtitles();if(state.hls&&state.hls.subtitleTracks?.length){state.hls.subtitleTracks.forEach((t,i)=>{const o=document.createElement('option');o.value=String(i);o.textContent=t.name||t.lang||('مسار '+(i+1));s.append(o)})}else{const tracks=$('video').textTracks;for(let i=0;i<tracks.length;i++){const o=document.createElement('option');o.value=String(i);o.textContent=tracks[i].label||tracks[i].language||('مسار '+(i+1));s.append(o)}}}
-function stopPlayer(){if(state.hls){state.hls.destroy();state.hls=null}if(state.tsPlayer){state.tsPlayer.destroy();state.tsPlayer=null}$('video').pause();$('video').removeAttribute('src');$('video').load();$('playerBox').classList.remove('show');state.activeStreafunction clearPlayTimer(){if(state.playTimer){clearTimeout(state.playTimer);state.playTimer=null}}
+function clearPlayTimer(){if(state.playTimer){clearTimeout(state.playTimer);state.playTimer=null}}
 function playbackStatus(msg){$('playerStatus').textContent=msg}
 function startPlaybackAttempt(stream){
   const seq=stream.seq, attempt=stream.attempt;
