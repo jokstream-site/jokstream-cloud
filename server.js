@@ -10,6 +10,9 @@ const clientUser = process.env.JOKSTREAM_USERNAME || "";
 const clientPass = process.env.JOKSTREAM_PASSWORD || "";
 const publicSessionSecret = randomBytes(32);
 const sessionRequests = new Map();
+const catalogCache = new Map();
+const CATALOG_ACTIONS = new Set(["get_live_streams", "get_vod_streams", "get_series"]);
+
 function issuePublicToken(ip) {
   const now = Date.now(), recent = (sessionRequests.get(ip) || []).filter(t => now - t < 3600000);
   if (recent.length >= 60) return null;
@@ -136,6 +139,41 @@ const server = http.createServer(async (req, res) => {
       const token = issuePublicToken(requestIp(req));
       if (!token) { res.setHeader("Retry-After", "3600"); return json(res, 429, { error: "Session limit reached. Please try again in about one hour." }); }
       return json(res, 200, { ok: true, token, expires_in: 1200 });
+    }
+    if (requestUrl.pathname === "/public/catalog") {
+      if (!publicAuthorized(requestUrl, req)) return json(res, 401, { error: "Test session expired. Refresh the page." });
+      const action = requestUrl.searchParams.get("action") || "";
+      if (!CATALOG_ACTIONS.has(action)) return json(res, 400, { error: "Unsupported catalog action" });
+      const rawOffset = Number(requestUrl.searchParams.get("offset") || 0);
+      const rawLimit = Number(requestUrl.searchParams.get("limit") || 20);
+      if (!Number.isInteger(rawOffset) || rawOffset < 0 || rawOffset > 1000000) return json(res, 400, { error: "Invalid catalog offset" });
+      if (!Number.isInteger(rawLimit) || rawLimit < 1 || rawLimit > 50) return json(res, 400, { error: "Catalog page size must be between 1 and 50" });
+      const categoryId = requestUrl.searchParams.get("category_id") || "";
+      const cacheKey = action + ":" + categoryId;
+      let entry = catalogCache.get(cacheKey);
+      if (!entry || Date.now() - entry.time > 60000) {
+        const b = upstreamBase();
+        b.pathname = b.pathname.replace(/\/$/, "") + "/player_api.php";
+        b.search = "";
+        b.searchParams.set("username", upstreamUser);
+        b.searchParams.set("password", upstreamPass);
+        b.searchParams.set("action", action);
+        if (categoryId) b.searchParams.set("category_id", categoryId);
+        const upstream = await safeFetch(b, { accept: "application/json" });
+        const raw = await upstream.text();
+        if (!upstream.ok) throw new Error("Catalog source returned HTTP " + upstream.status);
+        let parsed;
+        try { parsed = JSON.parse(raw); } catch { throw new Error("Catalog source returned invalid JSON"); }
+        if (!Array.isArray(parsed)) {
+          const reason = parsed && typeof parsed === "object" ? (parsed.message || parsed.error || parsed.status || "unexpected response") : "unexpected response";
+          throw new Error("Catalog source did not return a list: " + String(reason).slice(0, 180));
+        }
+        entry = { time: Date.now(), items: parsed };
+        catalogCache.set(cacheKey, entry);
+        if (catalogCache.size > 30) catalogCache.delete(catalogCache.keys().next().value);
+      }
+      const items = entry.items.slice(rawOffset, rawOffset + rawLimit);
+      return json(res, 200, { items, total: entry.items.length, offset: rawOffset, limit: rawLimit, hasMore: rawOffset + items.length < entry.items.length });
     }
     if (requestUrl.pathname === "/public/player_api.php") {
       if (!publicAuthorized(requestUrl, req)) return json(res, 401, { error: "Test session expired. Refresh the page." });
