@@ -75,6 +75,7 @@ function startPlaybackAttempt(stream){
   if(state.tsPlayer){try{state.tsPlayer.destroy()}catch{} state.tsPlayer=null}
   const v=$('video'); v.pause(); v.removeAttribute('src'); v.load(); resetSubtitles();
   const mode=stream.mode;
+  const mediaUrl=mode==='ts'&&stream.tsUrl?stream.tsUrl:stream.url;
   playbackStatus(mode==='ts'?'جارٍ تحميل MPEG-TS...':'جارٍ تحميل HLS (.m3u8)...');
   const finishPlaying=()=>{if(!state.activeStream||state.activeStream.seq!==seq)return;clearPlayTimer();stream.playing=true;playbackStatus('يعمل الآن')};
   v.onplaying=finishPlaying;
@@ -82,7 +83,7 @@ function startPlaybackAttempt(stream){
   state.playTimer=setTimeout(()=>{if(state.activeStream&&state.activeStream.seq===seq&&!stream.playing)failPlayback(stream,'timeout')},15000);
 
   if(mode==='ts'&&window.mpegts&&mpegts.isSupported()){
-    state.tsPlayer=mpegts.createPlayer({type:'mpegts',isLive:true,url:stream.url},{enableWorker:true,liveBufferLatencyChasing:true,liveBufferLatencyMaxLatency:8,liveBufferLatencyMinRemain:2});
+    state.tsPlayer=mpegts.createPlayer({type:'mpegts',isLive:true,url:mediaUrl},{enableWorker:true,liveBufferLatencyChasing:true,liveBufferLatencyMaxLatency:8,liveBufferLatencyMinRemain:2});
     state.tsPlayer.attachMediaElement(v);
     state.tsPlayer.on(mpegts.Events.ERROR,()=>failPlayback(stream,'ts'));
     state.tsPlayer.load();
@@ -90,10 +91,10 @@ function startPlaybackAttempt(stream){
     return;
   }
 
-  const isHls=/\\.m3u8(?:$|\\?)/i.test(stream.url);
+  const isHls=/\.m3u8(?:$|\?)/i.test(mediaUrl);
   if(isHls&&window.Hls&&Hls.isSupported()){
     state.hls=new Hls({enableWorker:true,lowLatencyMode:false,maxBufferLength:30,liveSyncDurationCount:3,backBufferLength:30,enableWebVTT:true,renderTextTracksNatively:true});
-    state.hls.loadSource(stream.url);
+    state.hls.loadSource(mediaUrl);
     state.hls.attachMedia(v);
     state.hls.on(Hls.Events.MANIFEST_PARSED,()=>{playbackStatus('تم تحميل HLS — بدء التشغيل');v.play().catch(()=>playbackStatus('تم التحميل — اضغط تشغيل'))});
     state.hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED,setSubtitleOptions);
@@ -151,7 +152,7 @@ function playUrl(url,title,options={}){
   $('playerBox').scrollIntoView({behavior:'smooth',block:'start'});
   startPlaybackAttempt(stream);
 }
-function playItem(id){const x=items().find(a=>String(itemId(a))===String(id));if(!x)return;let url;if(state.tab==='live'){url=API+'/public/live/'+encodeURIComponent(id)+'.m3u8?token='+encodeURIComponent(state.token);playUrl(url,itemName(x),{mode:'hls',live:true,id});return}url=API+'/public/movie/'+encodeURIComponent(id)+'.'+extOf(x)+'?token='+encodeURIComponent(state.token);playUrl(url,itemName(x))}
+async function playItem(id){const x=items().find(a=>String(itemId(a))===String(id));if(!x)return;let url;if(state.tab==='live'){playbackStatus('جارٍ تحديد رابط البث...');try{const h=await api('/public/live-url?token='+encodeURIComponent(state.token)+'&id='+encodeURIComponent(id)+'&format=m3u8');let tsUrl='';try{const t=await api('/public/live-url?token='+encodeURIComponent(state.token)+'&id='+encodeURIComponent(id)+'&format=ts');tsUrl=t.url||''}catch{};playUrl(h.url,itemName(x),{mode:'hls',live:true,id,tsUrl});}catch(e){playbackStatus('تعذر تحديد رابط البث');showNotice('تعذر الحصول على رابط البث: '+e.message,true)}return}url=API+'/public/movie/'+encodeURIComponent(id)+'.'+extOf(x)+'?token='+encodeURIComponent(state.token);playUrl(url,itemName(x))}
 async function getInfo(tabName,id){const action=tabName==='movie'?'get_vod_info':'get_series_info';const key=tabName==='movie'?'vod_id':'series_id';return api('/public/player_api.php?token='+encodeURIComponent(state.token)+'&action='+action+'&'+key+'='+encodeURIComponent(id))}
 function showDetails(title,html){$('detailTitle').textContent=title;$('detailBody').innerHTML=html;$('modal').classList.add('show')}
 async function details(id,episodes=false){const type=state.tab,x=items().find(a=>String(itemId(a))===String(id));if(!x)return;if(type==='live'){showDetails(itemName(x),'<p class="plot">القناة: '+safe(itemName(x))+'</p><p class="plot">رقم المصدر: '+safe(id)+'</p>');return}showDetails(itemName(x),'<p class="plot">جارٍ تحميل التفاصيل والحلقات من المزود...</p>');try{const data=await getInfo(type,id);if(type==='movie'){const info=data.info||{},movie=data.movie_data||{};showDetails(itemName(x),'<p class="plot">'+safe(first(info.plot,info.description,'لا توجد نبذة متاحة من المزود.'))+'</p><p class="muted">السنة: '+safe(first(info.releasedate,info.year,'—'))+' · التقييم: '+safe(first(info.rating,'—'))+'</p>')}else{state.seriesInfo=data;const info=data.info||{},eps=data.episodes||{};const flat=Object.entries(eps).flatMap(([season,list])=>(Array.isArray(list)?list:[]).map(ep=>({...ep,_season:season})));const epHtml=flat.map(ep=>'<button class="episode" data-episode="'+safe(first(ep.id,ep.episode_id,''))+'" data-ext="'+safe(first(ep.container_extension,'mp4'))+'" data-epname="'+safe(first(ep.title,ep.episode_num,'حلقة'))+'"><strong>'+safe(first(ep.title,'الحلقة '+first(ep.episode_num,'')))+'</strong><small>الموسم '+safe(ep._season)+' · الحلقة '+safe(first(ep.episode_num,'—'))+'</small></button>').join('');showDetails(itemName(x),'<p class="plot">'+safe(first(info.plot,info.description,'لا توجد نبذة متاحة.'))+'</p><p class="muted">عدد الحلقات المعادة: '+flat.length+'</p><div class="episodes">'+(epHtml||'<p class="plot">لم يعِد المزود قائمة حلقات لهذا المسلسل.</p>')+'</div>')}}catch(e){showDetails(itemName(x),'<p class="plot">تعذر جلب التفاصيل: '+safe(e.message)+'</p>')}}
