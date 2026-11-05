@@ -46,7 +46,8 @@ const first=(...v)=>v.find(x=>x!==undefined&&x!==null&&x!=='');
 function showNotice(msg,error=false){$('notice').hidden=!msg;$('notice').className='notice'+(error?' error':'');$('notice').textContent=msg||''}
 async function api(path){const r=await fetch(API+path,{cache:'no-store'});const raw=await r.text();let data;try{data=JSON.parse(raw)}catch{throw new Error('رد غير مفهوم من الخادم (HTTP '+r.status+')')}if(!r.ok||data?.error)throw new Error(data?.error||('HTTP '+r.status));return data}
 function arr(x){return Array.isArray(x)?x:Array.isArray(x?.data)?x.data:[]}
-{return Array.isArray(x)?x:Array.isArray(x?.data)?x.data:[]}
+async function catalog(action){return api('/api?action='+encodeURIComponent(action))}
+async function catalogPage(kind,categoryId,page){const q=new URLSearchParams({kind,page:String(page),limit:'20'});if(categoryId)q.set('category_id',categoryId);return api('/api/catalog?'+q.toString())}
 function itemId(x){return first(x.stream_id,x.series_id,x.id)}
 function itemName(x){return first(x.name,x.title,x.stream_name,'بدون اسم')}
 function itemCat(x){return String(first(x.category_id,x.categoryId,''))}
