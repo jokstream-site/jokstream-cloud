@@ -216,8 +216,10 @@ const server = http.createServer(async (req, res) => {
       const target = sourceUrl("live", id, extension);
       const upstream = await safeFetch(target, { accept: "application/vnd.apple.mpegurl,application/octet-stream,*/*" });
       if (!upstream.ok) return json(res, upstream.status, { error: "Live source returned HTTP " + upstream.status });
+      const resolved = new URL(upstream.url || target.toString());
+      console.log("live_url_resolved:", format, resolved.hostname, upstream.status);
       try { upstream.body && upstream.body.cancel(); } catch {}
-      return json(res, 200, { ok: true, format, url: proxyUrl(requestUrl, target) });
+      return json(res, 200, { ok: true, format, url: proxyUrl(requestUrl, resolved) });
     }
     if (requestUrl.pathname === "/public/player_api.php") {
       if (!publicAuthorized(requestUrl, req)) return json(res, 401, { error: "Test session expired. Refresh the page." });
