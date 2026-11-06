@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "jokstream-p2p-lab",
+  "main": "worker.js",
+  "compatibility_date": "2026-11-06",
+  "observability": {
+    "enabled": true,
+    "traces": { "enabled": true }
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "PEER_ROOM", "class_name": "PeerRoom" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["PeerRoom"] }
+  ],
+  "vars": {
+    "ALLOWED_ORIGINS": "https://jokstream1.netlify.app"
+  }
+}
