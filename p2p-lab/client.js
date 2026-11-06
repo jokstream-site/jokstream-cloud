@@ -88,15 +88,24 @@ export class JokPeerMesh {
         const value = await this.onSegment(msg.key);
         if (value) await this._sendBytes(peerId, msg.key, value);
       } else if (msg.type === "segment-meta") {
+        const pending = this.pending.get(msg.key);
+        if (!pending || pending.peerId !== peerId || !Number.isInteger(msg.total) || msg.total < 1 || msg.total > 512) return;
         this.receiving.set(peerId + ":" + msg.key, { key: msg.key, chunks: new Array(msg.total), received: 0, total: msg.total });
         this.incomingKeyByPeer.set(peerId, msg.key);
       } else if (msg.type === "segment-chunk") {
         const current = this.receiving.get(peerId + ":" + msg.key);
-        if (current) current.nextIndex = msg.index;
+        if (current && Number.isInteger(msg.index) && msg.index >= 0 && msg.index < current.total) current.nextIndex = msg.index;
       } else if (msg.type === "segment-end") {
         const key = peerId + ":" + msg.key, current = this.receiving.get(key);
         if (!current) return;
+        if (current.received !== current.total || current.chunks.some(chunk => !chunk)) {
+          this.receiving.delete(key); this.incomingKeyByPeer.delete(peerId);
+          const pending = this.pending.get(msg.key);
+          if (pending && pending.peerId === peerId) { this.pending.delete(msg.key); pending.reject(new Error("Incomplete peer segment")); }
+          return;
+        }
         const size = current.chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+        if (size > 8 * 1024 * 1024) { this.receiving.delete(key); this.incomingKeyByPeer.delete(peerId); return; }
         const merged = new Uint8Array(size); let offset = 0;
         for (const chunk of current.chunks) { merged.set(new Uint8Array(chunk), offset); offset += chunk.byteLength; }
         this.receiving.delete(key);
@@ -119,6 +128,7 @@ export class JokPeerMesh {
     const channel = this.channels.get(peerId);
     if (!channel || channel.readyState !== "open") return;
     const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
+    if (!bytes.byteLength || bytes.byteLength > 8 * 1024 * 1024) return;
     const chunkSize = 16 * 1024, total = Math.ceil(bytes.byteLength / chunkSize);
     channel.send(JSON.stringify({ type: "segment-meta", key, total }));
     for (let index = 0; index < total; index++) {
