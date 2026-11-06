@@ -265,7 +265,7 @@ function stopPlayer(){
 }
 function playUrl(url,title,options={}){
   stopPlayer();
-  const stream={url,title,options,live:!!options.live,id:options.id||'',mode:options.mode||(/\\.ts(?:$|\\?)/i.test(url)?'ts':'hls'),attempt:0,maxAttempts:3,playing:false,done:false,seq:++state.playSeq};
+  const stream={url,title,options,live:!!options.live,id:options.id||'',tsUrl:options.tsUrl||'',mode:options.mode||(/\\.ts(?:$|\\?)/i.test(url)?'ts':'hls'),attempt:0,maxAttempts:3,playing:false,done:false,seq:++state.playSeq};
   state.activeStream=stream;
   $('nowPlaying').textContent=title;
   $('playerStatus').textContent='جارٍ الاتصال...';
