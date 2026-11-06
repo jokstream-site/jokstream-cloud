@@ -8,6 +8,7 @@ export class JokPeerMesh {
     this.channels = new Map();
     this.pending = new Map();
     this.receiving = new Map();
+    this.incomingKeyByPeer = new Map();
     this.closed = false;
   }
 
@@ -88,6 +89,7 @@ export class JokPeerMesh {
         if (value) await this._sendBytes(peerId, msg.key, value);
       } else if (msg.type === "segment-meta") {
         this.receiving.set(peerId + ":" + msg.key, { key: msg.key, chunks: new Array(msg.total), received: 0, total: msg.total });
+        this.incomingKeyByPeer.set(peerId, msg.key);
       } else if (msg.type === "segment-chunk") {
         const current = this.receiving.get(peerId + ":" + msg.key);
         if (current) current.nextIndex = msg.index;
@@ -98,12 +100,14 @@ export class JokPeerMesh {
         const merged = new Uint8Array(size); let offset = 0;
         for (const chunk of current.chunks) { merged.set(new Uint8Array(chunk), offset); offset += chunk.byteLength; }
         this.receiving.delete(key);
+        this.incomingKeyByPeer.delete(peerId);
         const pending = this.pending.get(msg.key);
-        if (pending) { this.pending.delete(msg.key); pending.resolve(merged); }
+        if (pending && pending.peerId === peerId) { this.pending.delete(msg.key); pending.resolve(merged); }
       }
       return;
     }
-    const current = this.receiving.get(peerId + ":" + this._activeReceiveKey);
+    const activeKey = this.incomingKeyByPeer.get(peerId);
+    const current = activeKey ? this.receiving.get(peerId + ":" + activeKey) : null;
     if (current && Number.isInteger(current.nextIndex)) {
       current.chunks[current.nextIndex] = data;
       current.received++;
@@ -140,8 +144,7 @@ export class JokPeerMesh {
     const peer = peers[Math.floor(Math.random() * peers.length)];
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => { this.pending.delete(key); reject(new Error("Peer segment timeout")); }, timeoutMs);
-      this.pending.set(key, { resolve: value => { clearTimeout(timer); resolve(value); }, reject });
-      this._activeReceiveKey = key;
+      this.pending.set(key, { peerId: peer[0], resolve: value => { clearTimeout(timer); resolve(value); }, reject });
       peer[1].send(JSON.stringify({ type: "get-segment", key }));
     });
   }
@@ -154,6 +157,8 @@ export class JokPeerMesh {
     try { this.channels.get(peerId)?.close(); } catch {}
     try { this.peerConnections.get(peerId)?.close(); } catch {}
     this.channels.delete(peerId); this.peerConnections.delete(peerId);
+    this.incomingKeyByPeer.delete(peerId);
+    for (const [key, pending] of this.pending) if (pending.peerId === peerId) { pending.reject(new Error("Peer disconnected")); this.pending.delete(key); }
   }
 
   close() {
