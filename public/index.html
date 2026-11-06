@@ -193,8 +193,9 @@ function startPlaybackAttempt(stream){
   if(state.hls){try{state.hls.destroy()}catch{} state.hls=null}
   if(state.tsPlayer){try{state.tsPlayer.destroy()}catch{} state.tsPlayer=null}
   const v=$('video'); v.pause(); v.removeAttribute('src'); v.load(); resetSubtitles();
-  const mode=stream.mode;
-  const mediaUrl=mode==='ts'&&stream.tsUrl?stream.tsUrl:stream.url;
+  // Use MPEG-TS only when the browser can demux it; otherwise keep the HLS URL.
+  const mode=stream.mode==='ts'&&stream.tsUrl&&window.mpegts&&mpegts.isSupported()?'ts':'hls';
+  const mediaUrl=mode==='ts'?stream.tsUrl:stream.url;
   playbackStatus(mode==='ts'?'جارٍ تحميل MPEG-TS...':'جارٍ تحميل HLS (.m3u8)...');
   const finishPlaying=()=>{if(!state.activeStream||state.activeStream.seq!==seq)return;clearPlayTimer();stream.playing=true;const ahead=window.JokBufferPolicy?Math.floor(JokBufferPolicy.secondsAhead(v)):0;playbackStatus('يعمل الآن · مخزون '+ahead+' ث')};
   v.ontimeupdate=()=>{if(state.activeStream&&state.activeStream.seq===seq&&stream.playing){const ahead=window.JokBufferPolicy?Math.floor(JokBufferPolicy.secondsAhead(v)):0;playbackStatus('يعمل الآن · مخزون '+ahead+' ث')}};
@@ -265,7 +266,7 @@ function stopPlayer(){
 }
 function playUrl(url,title,options={}){
   stopPlayer();
-  const stream={url,title,options,live:!!options.live,id:options.id||'',mode:options.mode||(/\\.ts(?:$|\\?)/i.test(url)?'ts':'hls'),attempt:0,maxAttempts:3,playing:false,done:false,seq:++state.playSeq};
+  const stream={url,title,options,live:!!options.live,id:options.id||'',tsUrl:options.tsUrl||'',mode:options.mode||(/\\.ts(?:$|\\?)/i.test(url)?'ts':'hls'),attempt:0,maxAttempts:3,playing:false,done:false,seq:++state.playSeq};
   state.activeStream=stream;
   $('nowPlaying').textContent=title;
   $('playerStatus').textContent='جارٍ الاتصال...';
