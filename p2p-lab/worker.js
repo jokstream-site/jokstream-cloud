@@ -100,7 +100,7 @@ export default {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin") || "";
     const allowedOrigins = (env.ALLOWED_ORIGINS || "").split(",").map(x => x.trim()).filter(Boolean);
-    if (allowedOrigins.length && origin && !allowedOrigins.includes(origin)) return json({ error: "Origin not allowed" }, 403);
+    if (allowedOrigins.length && !allowedOrigins.includes(origin)) return json({ error: "Origin not allowed" }, 403);
     if (url.pathname === "/health") return json({ ok: true, service: "jokstream-p2p-lab", mode: "signaling-only" });
     const match = url.pathname.match(/^\/room\/([a-zA-Z0-9_-]{8,120})$/);
     if (!match) return json({ error: "Not found" }, 404);
