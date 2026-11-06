@@ -102,7 +102,7 @@ export default {
     const allowedOrigins = (env.ALLOWED_ORIGINS || "").split(",").map(x => x.trim()).filter(Boolean);
     if (allowedOrigins.length && origin && !allowedOrigins.includes(origin)) return json({ error: "Origin not allowed" }, 403);
     if (url.pathname === "/health") return json({ ok: true, service: "jokstream-p2p-lab", mode: "signaling-only" });
-    const match = url.pathname.match(/^\\/room\\/([a-zA-Z0-9_-]{8,120})$/);
+    const match = url.pathname.match(/^\/room\/([a-zA-Z0-9_-]{8,120})$/);
     if (!match) return json({ error: "Not found" }, 404);
     const room = match[1];
     if (!(await verifyTicket(url.searchParams.get("ticket"), room, env.P2P_SIGNING_SECRET))) return json({ error: "Invalid or expired room ticket" }, 401);
