@@ -30,9 +30,9 @@ footer{padding:22px 0 40px;color:#728398;font-size:11px;text-align:center}
 <header class="top"><div class="brand">JOK<b>STREAM</b></div><div class="topright"><div class="health"><i class="dot" id="healthDot"></i><span id="healthText">جارٍ الاتصال</span></div></div></header>
 <section class="hero"><div class="eyebrow">منصتك للمشاهدة</div><h1>كل ما تحب مشاهدته، في مكان واحد</h1><p>قنوات مباشرة وأفلام ومسلسلات من كتالوج مزودك الفعلي. لا نعرض محتوى تجريبياً.</p>
 <div class="stats"><span class="stat">القنوات <strong id="liveTotal">—</strong></span><span class="stat">الأفلام <strong id="movieTotal">—</strong></span><span class="stat">المسلسلات <strong id="seriesTotal">—</strong></span><span class="stat">آخر تحديث <strong id="lastUpdate">—</strong></span></div></section>
-<div class="toolbar"><div class="tabs"><button class="tab active" data-tab="live">مباشر</button><button class="tab" data-tab="movie">أفلام</button><button class="tab" data-tab="series">مسلسلات</button></div><div class="search"><input id="search" type="search" placeholder="ابحث عن قناة أو فيلم أو مسلسل..." autocomplete="off"></div><select id="category"><option value="">كل التصنيفات</option></select><select id="country" hidden aria-label="تصفية حسب الدولة"><option value="">كل الدول</option></select></div>
+<div class="toolbar"><div class="tabs"><button class="tab active" data-tab="live">مباشر</button><button class="tab" data-tab="movie">أفلام</button><button class="tab" data-tab="series">مسلسلات</button></div><div class="search"><input id="search" type="search" placeholder="ابحث عن قناة أو فيلم أو مسلسل..." autocomplete="off"></div><select id="category"><option value="">كل التصنيفات</option></select><select id="country" hidden aria-label="تصفية حسب الدولة"><option value="">كل الدول</option></select><button id="subtitleAudit" type="button">اختبار الترجمات</button></div>
 <div class="folder-area"><div class="folder-heading">مجلدات التصنيفات</div><div id="categoryFolders" class="folder-grid"></div><div id="countryFolderHeading" class="folder-heading" hidden>مجلدات الدول</div><div id="countryFolders" class="folder-grid"></div></div>
-<div id="notice" class="notice" hidden></div>
+<div id="notice" class="notice" hidden></div><div id="subtitleAuditReport" class="notice" hidden aria-live="polite"></div>
 <section class="playerbox" id="playerBox"><div class="playerhead"><h3 id="nowPlaying">المشغل</h3><button class="close" id="closePlayer">إغلاق ✕</button></div><div class="videoarea"><video id="video" controls playsinline crossorigin="anonymous"></video></div><div class="playercontrols"><label>الترجمة <select id="subtitleSelect"><option value="-1">إيقاف / غير متاحة بعد</option></select></label><button id="retryPlayback">إعادة المحاولة</button><span class="playerstatus" id="playerStatus">جاهز</span></div></section>
 <div class="sectionhead"><h2 id="listTitle">القنوات المباشرة</h2><span class="muted" id="shownCount"></span></div>
 <div class="grid" id="catalog"></div><div id="empty" class="empty" hidden>لا توجد نتائج مطابقة.</div><button class="more" id="loadMore" hidden>تحميل المزيد</button>
@@ -108,8 +108,52 @@ async function loadPage(t,reset,query=$('search').value.trim()){const cfg=sectio
 async function tab(t){state.tab=t;document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));$('country').hidden=t!=='live';$('listTitle').textContent=sectionConfig[t].label;state.total=state.totals[t]||0;state.hasMore=state.more[t]||false;if(!state.loadedTabs[t]){const cfg=sectionConfig[t];showNotice('جارٍ جلب تصنيفات '+cfg.label+'...');setHealth(false,'جارٍ الاتصال');const cats=await catalog(cfg.cats);state[cfg.catsKey]=arr(cats);refreshCategory();await loadPage(t,true);state.loadedTabs[t]=true}else{refreshCategory();setHealth(true,'متصل بالمصدر');render()}}
 function setHealth(ok,msg){$('healthDot').className='dot '+(ok?'good':'bad');$('healthText').textContent=msg}
 async function load(){showNotice('جارٍ اختبار Cloudflare...');setHealth(false,'جارٍ الاتصال');try{const h=await api('/health');if(!h.providerSecret)throw new Error('ضع رابط M3U في Secret باسم XIRO_M3U_URL في Cloudflare أولاً');setHealth(true,'Cloudflare يعمل');await tab('live');$('lastUpdate').textContent=new Date().toLocaleTimeString('ar')}catch(e){setHealth(false,'تعذر الاتصال');showNotice('تعذر الاتصال بـ Cloudflare: '+e.message,true);$('catalog').innerHTML='';$('empty').hidden=true}}
-function resetSubtitles(){const s=$('subtitleSelect');s.innerHTML='<option value="-1">إيقاف / غير متاحة</option>'}
-function setSubtitleOptions(){const s=$('subtitleSelect');resetSubtitles();if(state.hls&&state.hls.subtitleTracks?.length){state.hls.subtitleTracks.forEach((t,i)=>{const o=document.createElement('option');o.value=String(i);o.textContent=t.name||t.lang||('مسار '+(i+1));s.append(o)})}else{const tracks=$('video').textTracks;for(let i=0;i<tracks.length;i++){const o=document.createElement('option');o.value=String(i);o.textContent=tracks[i].label||tracks[i].language||('مسار '+(i+1));s.append(o)}}}
+function resetSubtitles(){const s=$('subtitleSelect');s.innerHTML='<option value="-1">مسارات الترجمة: 0</option>'}
+function setSubtitleOptions(){const s=$('subtitleSelect');resetSubtitles();let count=0;if(state.hls&&state.hls.subtitleTracks?.length){const tracks=state.hls.subtitleTracks;count=tracks.length;tracks.forEach((t,i)=>{const o=document.createElement('option');o.value=String(i);o.textContent=t.name||t.lang||('مسار '+(i+1));s.append(o)})}else{const tracks=$('video').textTracks;count=tracks.length;for(let i=0;i<tracks.length;i++){const o=document.createElement('option');o.value=String(i);o.textContent=tracks[i].label||tracks[i].language||('مسار '+(i+1));s.append(o)}}s.options[0].textContent='مسارات الترجمة المكتشفة: '+count;}
+async function auditSubtitles(){
+  const button=$('subtitleAudit'),report=$('subtitleAuditReport');
+  button.disabled=true;button.textContent='جارٍ الفحص...';report.hidden=false;
+  report.textContent='يتم فحص عينة من 10 أفلام و10 مسلسلات من بيانات المزود. قد يستغرق ذلك بعض الوقت...';
+  const results=[];
+  function collect(value){
+    const found=[];
+    const pattern=/subtitle|subtitles|caption|closed_caption|subtitle_url|caption_url/i;
+    function walk(node){
+      if(!node||typeof node!=='object')return;
+      for(const [key,val] of Object.entries(node)){
+        if(pattern.test(key)&&val!==null&&val!==undefined&&val!==''){
+          const entries=Array.isArray(val)?val:[val];
+          for(const entry of entries)if(entry!==null&&entry!==undefined&&entry!=='')found.push(entry);
+        }else if(typeof val==='object')walk(val);
+      }
+    }
+    walk(value);
+    const unique=new Map();
+    for(const entry of found){let key;try{key=JSON.stringify(entry)}catch{key=String(entry)}unique.set(key,entry)}
+    return [...unique.values()];
+  }
+  try{
+    for(const kind of ['movies','series']){
+      const catalogData=await catalogPage(kind,'',1,'');
+      const sample=arr(catalogData).slice(0,10);
+      let tested=0,withTracks=0,totalTracks=0,errors=0;
+      const examples=[];
+      for(let i=0;i<sample.length;i++){
+        const item=sample[i],id=itemId(item);
+        if(!id)continue;
+        try{
+          const info=await getInfo(kind==='movies'?'movie':'series',id);
+          const tracks=collect(info);
+          tested++;totalTracks+=tracks.length;
+          if(tracks.length){withTracks++;examples.push(itemName(item)+' ('+tracks.length+')')}
+        }catch{errors++}
+      }
+      results.push({kind:kind==='movies'?'الأفلام':'المسلسلات',tested,withTracks,totalTracks,errors,examples});
+    }
+    report.innerHTML='<strong>نتيجة فحص بيانات المزود</strong><br>'+results.map(r=>'<p>'+r.kind+': فُحص '+r.tested+'، عناصر بها بيانات ترجمة '+r.withTracks+'، إجمالي مسارات الترجمة المكتشفة '+r.totalTracks+'، أخطاء '+r.errors+'.'+(r.examples.length?'<br>أمثلة: '+safe(r.examples.join('، ')):'')+'</p>').join('')+'<small>هذا الفحص يقرأ بيانات تفاصيل العناوين. قد يحتوي ملف HLS على ترجمات لا يعلنها API؛ شغّل عنواناً ثم راقب «مسارات الترجمة المكتشفة» في المشغل للتحقق من مسارات HLS الفعلية.</small>';
+  }catch(error){report.textContent='تعذر إكمال الاختبار: '+error.message}
+  finally{button.disabled=false;button.textContent='إعادة اختبار الترجمات'}
+}
 function clearPlayTimer(){if(state.playTimer){clearTimeout(state.playTimer);state.playTimer=null}}
 function playbackStatus(msg){$('playerStatus').textContent=msg}
 function startPlaybackAttempt(stream){
@@ -211,7 +255,7 @@ async function searchAcrossLoadedPages(){
   if(request===searchRequest&&tabNow===state.tab)await loadPage(tabNow,true,query).catch(()=>{});
   if(request===searchRequest&&tabNow===state.tab)render();
 }
-$('search').addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>searchAcrossLoadedPages().catch(()=>{}),280)});$('country').addEventListener('change',render);$('category').addEventListener('change',()=>{state.selectedCategories[state.tab]=$('category').value;loadPage(state.tab,true).catch(()=>{})});$('loadMore').addEventListener('click',()=>loadPage(state.tab,false).catch(()=>{}));$('closePlayer').addEventListener('click',stopPlayer);$('closeModal').addEventListener('click',()=>$('modal').classList.remove('show'));$('modal').addEventListener('click',e=>{if(e.target===$('modal'))$('modal').classList.remove('show')});$('retryPlayback').addEventListener('click',()=>{if(state.activeStream){const s=state.activeStream;playUrl(s.url,s.title,s.options)}});$('subtitleSelect').addEventListener('change',()=>{const n=Number($('subtitleSelect').value);if(state.hls){state.hls.subtitleTrack=n}else{const tracks=$('video').textTracks;for(let i=0;i<tracks.length;i++)tracks[i].mode=i===n?'showing':'disabled'}});
+$('search').addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>searchAcrossLoadedPages().catch(()=>{}),280)});$('country').addEventListener('change',render);$('category').addEventListener('change',()=>{state.selectedCategories[state.tab]=$('category').value;loadPage(state.tab,true).catch(()=>{})});$('loadMore').addEventListener('click',()=>loadPage(state.tab,false).catch(()=>{}));$('subtitleAudit').addEventListener('click',()=>auditSubtitles());$('closePlayer').addEventListener('click',stopPlayer);$('closeModal').addEventListener('click',()=>$('modal').classList.remove('show'));$('modal').addEventListener('click',e=>{if(e.target===$('modal'))$('modal').classList.remove('show')});$('retryPlayback').addEventListener('click',()=>{if(state.activeStream){const s=state.activeStream;playUrl(s.url,s.title,s.options)}});$('subtitleSelect').addEventListener('change',()=>{const n=Number($('subtitleSelect').value);if(state.hls){state.hls.subtitleTrack=n}else{const tracks=$('video').textTracks;for(let i=0;i<tracks.length;i++)tracks[i].mode=i===n?'showing':'disabled'}});
 load();
 })();
 </script>
