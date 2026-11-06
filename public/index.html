@@ -118,24 +118,24 @@ function renderFolders(){const cats=$('categoryFolders'),countriesHost=$('countr
 function render(){const query=$('search').value.trim(),cat=$('category').value,country=state.tab==='live'?($('country')?.value||''):'';const list=items().map(x=>({item:x,score:searchScore(x,query)})).filter(v=>(!cat||itemCat(v.item)===cat)&&(!country||itemCountry(v.item)===country)&&(!query||v.score>0)).sort((a,b)=>b.score-a.score).map(v=>v.item);$('catalog').innerHTML=list.map(x=>{const id=itemId(x),img=imageOf(x),name=itemName(x),kind=state.tab==='live'?'مباشر':state.tab==='movie'?'فيلم':'مسلسل',meta=first(x.category_name,x.year,x.stream_type,'—'),rating=first(x.rating,x.rating_5,x.rating_4_5,'');return '<article class="tile"><div class="poster">'+(img?'<img loading="lazy" src="'+safe(img)+'" alt="" onerror="this.remove()">':'<span class="placeholder">▶</span>')+'<span class="kind">'+kind+'</span>'+(rating?'<span class="poster-rate">★ '+safe(rating)+'</span>':'')+'</div><div class="tilebody"><div class="tiletitle">'+safe(name)+'</div><div class="tilemeta">'+safe(meta)+'</div><div class="tileactions">'+(state.tab==='series'?'<button class="smallbtn primary" data-detail="'+safe(id)+'">الحلقات</button>':'<button class="smallbtn primary" data-play="'+safe(id)+'">تشغيل</button>')+'<button class="smallbtn" data-info="'+safe(id)+'">تفاصيل</button></div></div></article>'}).join('');$('empty').hidden=!!list.length;$('shownCount').textContent='عرض '+list.length+' من '+state.total;$('loadMore').hidden=!state.hasMore;$('loadMore').disabled=!!state.loadingTabs[state.tab];$('loadMore').textContent=state.loadingTabs[state.tab]?'جارٍ التحميل...':'تحميل 100 إضافية'}
 const sectionConfig={live:{cats:'get_live_categories',action:'get_live_streams',items:'live',catsKey:'liveCats',label:'القنوات'},movie:{cats:'get_vod_categories',action:'get_vod_streams',items:'movies',catsKey:'movieCats',label:'الأفلام'},series:{cats:'get_series_categories',action:'get_series',items:'series',catsKey:'seriesCats',label:'المسلسلات'}};
 function updateStats(){$('liveTotal').textContent=state.totals.live===null?'—':Number(state.totals.live).toLocaleString('ar');$('movieTotal').textContent=state.totals.movie===null?'—':Number(state.totals.movie).toLocaleString('ar');$('seriesTotal').textContent=state.totals.series===null?'—':Number(state.totals.series).toLocaleString('ar')}
-async function loadPage(t,reset,query=$('search').value.trim()){const cfg=sectionConfig[t];if(state.loadingTabs[t])return false;state.loadingTabs[t]=true;if(reset){state[cfg.items]=[];state.pages[t]=0;}render();showNotice('جارٍ تحميل '+(query?'نتائج البحث في ':'')+cfg.label+'...');try{const page=reset?1:state.pages[t]+1;const kind=t==='movie'?'movies':t;const data=await catalogPage(kind,state.selectedCategories[t]||'',page,query);const rows=arr(data.items);state[cfg.items]=reset?rows:state[cfg.items].concat(rows);state.pages[t]=page;if(t==='live')refreshCountries();state.totals[t]=Number(data.total||0);state.more[t]=!!data.has_more;state.total=Number(data.total||0);state.hasMore=state.more[t];updateStats();setHealth(true,'الوسيط متصل');showNotice('تم تحميل '+rows.length+' عنصر.');render()}catch(e){setHealth(false,'الوسيط متصل — خطأ بالكتالوج');showNotice('الوسيط متصل، لكن تعذر تحميل '+cfg.label+': '+e.message,true)}finally{state.loadingTabs[t]=false;render()}return true}
-async function tab(t){state.tab=t;document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));$('country').hidden=t!=='live';$('listTitle').textContent=sectionConfig[t].label;state.total=state.totals[t]||0;state.hasMore=state.more[t]||false;if(!state.loadedTabs[t]){const cfg=sectionConfig[t];showNotice('جارٍ جلب '+cfg.label+'...');setHealth(false,'جارٍ الاتصال بالوسيط');try{const cats=await catalog(cfg.cats);state[cfg.catsKey]=arr(cats)}catch(e){state[cfg.catsKey]=[];showNotice('تعذر جلب التصنيفات، سيتم عرض '+cfg.label+' بدون فلتر التصنيفات.')}refreshCategory();await loadPage(t,true);state.loadedTabs[t]=true}else{refreshCategory();setHealth(true,'الوسيط متصل بالمصدر');render()}}
+async function loadPage(t,reset,query=$('search').value.trim()){const cfg=sectionConfig[t];if(state.loadingTabs[t])return false;state.loadingTabs[t]=true;if(reset){state[cfg.items]=[];state.pages[t]=0;}render();showNotice('جارٍ تحميل '+(query?'نتائج البحث في ':'')+cfg.label+'...');try{const page=reset?1:state.pages[t]+1;const kind=t==='movie'?'movies':t;const data=await catalogPage(kind,state.selectedCategories[t]||'',page,query);const rows=arr(data.items);state[cfg.items]=reset?rows:state[cfg.items].concat(rows);state.pages[t]=page;if(t==='live')refreshCountries();state.totals[t]=Number(data.total||0);state.more[t]=!!data.has_more;state.total=Number(data.total||0);state.hasMore=state.more[t];updateStats();setHealth(true,'Cloudflare متصل');showNotice('تم تحميل '+rows.length+' عنصر.');render()}catch(e){setHealth(false,'Cloudflare متصل — خطأ بالكتالوج');showNotice('الوسيط متصل، لكن تعذر تحميل '+cfg.label+': '+e.message,true)}finally{state.loadingTabs[t]=false;render()}return true}
+async function tab(t){state.tab=t;document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));$('country').hidden=t!=='live';$('listTitle').textContent=sectionConfig[t].label;state.total=state.totals[t]||0;state.hasMore=state.more[t]||false;if(!state.loadedTabs[t]){const cfg=sectionConfig[t];showNotice('جارٍ جلب '+cfg.label+'...');setHealth(false,'جارٍ الاتصال');try{const cats=await catalog(cfg.cats);state[cfg.catsKey]=arr(cats)}catch(e){state[cfg.catsKey]=[];showNotice('تعذر جلب التصنيفات، سيتم عرض '+cfg.label+' بدون فلتر التصنيفات.')}refreshCategory();await loadPage(t,true);state.loadedTabs[t]=true}else{refreshCategory();setHealth(true,'متصل بالمصدر');render()}}
 function setHealth(ok,msg){$('healthDot').className='dot '+(ok?'good':'bad');$('healthText').textContent=msg}
 async function load(){
-  showNotice('جارٍ الاتصال بالوسيط...');
-  setHealth(false,'جارٍ الاتصال بالوسيط');
+  showNotice('جارٍ الاتصال بالمصدر...');
+  setHealth(false,'جارٍ الاتصال');
   // لا نجعل /health شرطاً لبدء الكتالوج؛ إذا كان Health بطيئاً لا تتجمد الواجهة.
   // نختبره في الخلفية فقط، بينما يبدأ تحميل أول دفعة من القنوات مباشرة.
   api('/health',{timeout:5000}).then(h=>{
-    if(h?.providerSecret===false||h?.providerSecret===null)setHealth(false,'الوسيط متصل لكن إعداد المصدر ناقص');
-    else setHealth(true,'الوسيط متصل');
+    if(h?.providerSecret===false||h?.providerSecret===null)setHealth(false,'Cloudflare متصل — المصدر غير مضبوط');
+    else setHealth(true,'Cloudflare متصل');
   }).catch(()=>{});
   try{
     await tab('live');
     $('lastUpdate').textContent=new Date().toLocaleTimeString('ar');
-    setHealth(true,'الوسيط متصل بالمصدر');
+    setHealth(true,'المصدر متصل');
   }catch(e){
-    setHealth(false,'تعذر الاتصال بالوسيط');
+    setHealth(false,'خطأ في الاتصال بالمصدر');
     showNotice('تعذر تحميل القنوات: '+e.message,true);
   }
 }
@@ -193,9 +193,8 @@ function startPlaybackAttempt(stream){
   if(state.hls){try{state.hls.destroy()}catch{} state.hls=null}
   if(state.tsPlayer){try{state.tsPlayer.destroy()}catch{} state.tsPlayer=null}
   const v=$('video'); v.pause(); v.removeAttribute('src'); v.load(); resetSubtitles();
-  // Use MPEG-TS only when the browser can demux it; otherwise keep the HLS URL.
-  const mode=stream.mode==='ts'&&stream.tsUrl&&window.mpegts&&mpegts.isSupported()?'ts':'hls';
-  const mediaUrl=mode==='ts'?stream.tsUrl:stream.url;
+  const mode=stream.mode;
+  const mediaUrl=mode==='ts'&&stream.tsUrl?stream.tsUrl:stream.url;
   playbackStatus(mode==='ts'?'جارٍ تحميل MPEG-TS...':'جارٍ تحميل HLS (.m3u8)...');
   const finishPlaying=()=>{if(!state.activeStream||state.activeStream.seq!==seq)return;clearPlayTimer();stream.playing=true;const ahead=window.JokBufferPolicy?Math.floor(JokBufferPolicy.secondsAhead(v)):0;playbackStatus('يعمل الآن · مخزون '+ahead+' ث')};
   v.ontimeupdate=()=>{if(state.activeStream&&state.activeStream.seq===seq&&stream.playing){const ahead=window.JokBufferPolicy?Math.floor(JokBufferPolicy.secondsAhead(v)):0;playbackStatus('يعمل الآن · مخزون '+ahead+' ث')}};
@@ -266,7 +265,7 @@ function stopPlayer(){
 }
 function playUrl(url,title,options={}){
   stopPlayer();
-  const stream={url,title,options,live:!!options.live,id:options.id||'',tsUrl:options.tsUrl||'',mode:options.mode||(/\\.ts(?:$|\\?)/i.test(url)?'ts':'hls'),attempt:0,maxAttempts:3,playing:false,done:false,seq:++state.playSeq};
+  const stream={url,title,options,live:!!options.live,id:options.id||'',mode:options.mode||(/\\.ts(?:$|\\?)/i.test(url)?'ts':'hls'),attempt:0,maxAttempts:3,playing:false,done:false,seq:++state.playSeq};
   state.activeStream=stream;
   $('nowPlaying').textContent=title;
   $('playerStatus').textContent='جارٍ الاتصال...';
