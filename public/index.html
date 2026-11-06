@@ -38,6 +38,7 @@ footer{padding:24px 0 42px;color:#687383;font-size:10px;text-align:center}
 <div class="modal" id="modal"><div class="dialog"><div class="dialoghead"><h2 id="detailTitle">التفاصيل</h2><button class="close" id="closeModal">إغلاق ✕</button></div><div id="detailBody"></div></div></div>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mpegts.js@1.8.0/dist/mpegts.min.js"></script>
+<script src="/player-buffer.js"></script>
 <script>
 (() => {
 const API='https://jokstream-api.abdonarjah.workers.dev';
@@ -179,7 +180,8 @@ function startPlaybackAttempt(stream){
   const mode=stream.mode;
   const mediaUrl=mode==='ts'&&stream.tsUrl?stream.tsUrl:stream.url;
   playbackStatus(mode==='ts'?'جارٍ تحميل MPEG-TS...':'جارٍ تحميل HLS (.m3u8)...');
-  const finishPlaying=()=>{if(!state.activeStream||state.activeStream.seq!==seq)return;clearPlayTimer();stream.playing=true;playbackStatus('يعمل الآن')};
+  const finishPlaying=()=>{if(!state.activeStream||state.activeStream.seq!==seq)return;clearPlayTimer();stream.playing=true;const ahead=window.JokBufferPolicy?Math.floor(JokBufferPolicy.secondsAhead(v)):0;playbackStatus('يعمل الآن · مخزون '+ahead+' ث')};
+  v.ontimeupdate=()=>{if(state.activeStream&&state.activeStream.seq===seq&&stream.playing){const ahead=window.JokBufferPolicy?Math.floor(JokBufferPolicy.secondsAhead(v)):0;playbackStatus('يعمل الآن · مخزون '+ahead+' ث')}};
   v.onplaying=finishPlaying;
   v.onerror=()=>{if(!state.activeStream||state.activeStream.seq!==seq)return; failPlayback(stream,'media')};
   state.playTimer=setTimeout(()=>{if(state.activeStream&&state.activeStream.seq===seq&&!stream.playing)failPlayback(stream,'timeout')},15000);
@@ -195,7 +197,7 @@ function startPlaybackAttempt(stream){
 
   const isHls=/\.m3u8(?:$|\?)/i.test(mediaUrl);
   if(isHls&&window.Hls&&Hls.isSupported()){
-    state.hls=new Hls({enableWorker:true,lowLatencyMode:false,maxBufferLength:30,liveSyncDurationCount:3,backBufferLength:30,enableWebVTT:true,renderTextTracksNatively:true});
+    state.hls=new Hls(window.JokBufferPolicy?JokBufferPolicy.config({live:stream.live}):{enableWorker:true,lowLatencyMode:false,maxBufferLength:stream.live?32:90,liveSyncDurationCount:3,backBufferLength:stream.live?18:90,enableWebVTT:true,renderTextTracksNatively:true});
     state.hls.loadSource(mediaUrl);
     state.hls.attachMedia(v);
     state.hls.on(Hls.Events.MANIFEST_PARSED,()=>{playbackStatus('تم تحميل HLS — بدء التشغيل');v.play().catch(()=>playbackStatus('تم التحميل — اضغط تشغيل'))});
@@ -241,7 +243,7 @@ function stopPlayer(){
   state.playSeq++;
   if(state.hls){try{state.hls.destroy()}catch{} state.hls=null}
   if(state.tsPlayer){try{state.tsPlayer.destroy()}catch{} state.tsPlayer=null}
-  const v=$('video');v.pause();v.onplaying=null;v.onerror=null;v.removeAttribute('src');v.load();
+  const v=$('video');v.pause();v.onplaying=null;v.ontimeupdate=null;v.onerror=null;v.removeAttribute('src');v.load();
   $('playerBox').classList.remove('show');state.activeStream=null;resetSubtitles();
 }
 function playUrl(url,title,options={}){
