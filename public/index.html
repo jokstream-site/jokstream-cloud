@@ -105,26 +105,21 @@ async function loadPage(t,reset,query=$('search').value.trim()){const cfg=sectio
 async function tab(t){state.tab=t;document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));$('country').hidden=t!=='live';$('listTitle').textContent=sectionConfig[t].label;state.total=state.totals[t]||0;state.hasMore=state.more[t]||false;if(!state.loadedTabs[t]){const cfg=sectionConfig[t];showNotice('جارٍ جلب '+cfg.label+'...');setHealth(false,'جارٍ الاتصال');try{const cats=await catalog(cfg.cats);state[cfg.catsKey]=arr(cats)}catch(e){state[cfg.catsKey]=[];showNotice('تعذر جلب التصنيفات، سيتم عرض '+cfg.label+' بدون فلتر التصنيفات.')}refreshCategory();await loadPage(t,true);state.loadedTabs[t]=true}else{refreshCategory();setHealth(true,'متصل بالمصدر');render()}}
 function setHealth(ok,msg){$('healthDot').className='dot '+(ok?'good':'bad');$('healthText').textContent=msg}
 async function load(){
-  showNotice('1/2 جارٍ اختبار الاتصال بـ Cloudflare...');
+  showNotice('جارٍ الاتصال بالمصدر...');
   setHealth(false,'جارٍ الاتصال');
+  // لا نجعل /health شرطاً لبدء الكتالوج؛ إذا كان Health بطيئاً لا تتجمد الواجهة.
+  // نختبره في الخلفية فقط، بينما يبدأ تحميل أول دفعة من القنوات مباشرة.
+  api('/health',{timeout:5000}).then(h=>{
+    if(h?.providerSecret===false||h?.providerSecret===null)setHealth(false,'Cloudflare متصل — المصدر غير مضبوط');
+    else setHealth(true,'Cloudflare متصل');
+  }).catch(()=>{});
   try{
-    const h=await api('/health',{timeout:12000});
-    if(h?.providerSecret===false||h?.providerSecret===null)throw new Error('Cloudflare متصل، لكن Secret الخاص بمصدر الكتالوج غير مضبوط');
-    setHealth(true,'Cloudflare متصل');
-    showNotice('2/2 تم الاتصال بـ Cloudflare — جارٍ جلب الكتالوج...');
-    try{
-      await tab('live');
-      $('lastUpdate').textContent=new Date().toLocaleTimeString('ar');
-      setHealth(true,'Cloudflare متصل');
-    }catch(e){
-      setHealth(false,'Cloudflare متصل — خطأ بالكتالوج');
-      showNotice('تم الاتصال بـ Cloudflare بنجاح، لكن تعذر جلب الكتالوج من الوسيط: '+e.message,true);
-    }
+    await tab('live');
+    $('lastUpdate').textContent=new Date().toLocaleTimeString('ar');
+    setHealth(true,'المصدر متصل');
   }catch(e){
-    setHealth(false,'فشل اتصال Cloudflare');
-    showNotice('لم تصل الواجهة إلى Cloudflare: '+e.message,true);
-    $('catalog').innerHTML='';
-    $('empty').hidden=true;
+    setHealth(false,'خطأ في الاتصال بالمصدر');
+    showNotice('تعذر تحميل القنوات: '+e.message,true);
   }
 }
 function resetSubtitles(){const s=$('subtitleSelect');s.innerHTML='<option value="-1">مسارات الترجمة: 0</option>'}
