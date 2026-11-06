@@ -15,7 +15,7 @@ export class JokPeerMesh {
   connect() {
     if (this.socket) return Promise.resolve();
     const url = new URL(this.signalingUrl);
-    url.pathname = url.pathname.replace(/\\/$/, "") + "/room/" + encodeURIComponent(this.room);
+    url.pathname = url.pathname.replace(/\/$/, "") + "/room/" + encodeURIComponent(this.room);
     url.searchParams.set("ticket", this.ticket);
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(url);
