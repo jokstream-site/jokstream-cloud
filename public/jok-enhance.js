@@ -42,32 +42,32 @@
   }
   function staticUi(){
     const d=LANGS[lang];
-    const set=(sel,html)=>{const el=document.querySelector(sel);if(el)el.innerHTML=html};
+    const set=(sel,html)=>{const el=document.querySelector(sel);if(el&&el.innerHTML!==html)el.innerHTML=html};
     set('.eyebrow',d.original);
     set('.hero h1',d.hero.replace(/\\n/g,'<br>'));
     set('.hero p',d.sub);
     set('.hero-btn.primary','▶ '+d.watch);
     set('.hero-btn.secondary','⌕ '+d.searchNow);
-    const stat=(sel,label)=>{const el=document.querySelector(sel);if(!el)return;const strong=el.querySelector('strong');const val=strong?strong.textContent:'—';el.innerHTML=label+' <strong>'+val+'</strong>'};
+    const stat=(sel,label)=>{const el=document.querySelector(sel);if(!el)return;const strong=el.querySelector('strong');const val=strong?strong.textContent:'—';const html=label+' <strong>'+val+'</strong>';if(el.innerHTML!==html)el.innerHTML=html};
     stat('.stat:nth-child(1)',d.channels);stat('.stat:nth-child(2)',d.movies);stat('.stat:nth-child(3)',d.series);
-    const search=document.getElementById('search');if(search)search.placeholder=d.search;
-    const tabs=document.querySelectorAll('.tab');if(tabs.length>=3){tabs[0].textContent=d.live;tabs[1].textContent=d.movies;tabs[2].textContent=d.series}
-    const cat=document.getElementById('category');if(cat?.options?.length)cat.options[0].textContent=d.allCategories;
-    const country=document.getElementById('country');if(country?.options?.length)country.options[0].textContent=d.allCountries;
-    const folderHead=document.querySelector('.folder-heading');if(folderHead)folderHead.textContent=d.categories;
-    const countryHead=document.getElementById('countryFolderHeading');if(countryHead)countryHead.textContent=d.countries;
-    const list=document.getElementById('listTitle');if(list){const tab=window.state?.tab||document.querySelector('.tab.active')?.dataset?.tab;list.textContent=tab==='movie'?d.movies:tab==='series'?d.series:d.channels}
-    const more=document.getElementById('loadMore');if(more&&!more.disabled)more.textContent=d.loadMore;
-    const empty=document.getElementById('empty');if(empty)empty.textContent=d.noResults;
+    const search=document.getElementById('search');if(search&&search.placeholder!==d.search)search.placeholder=d.search;
+    const tabs=document.querySelectorAll('.tab');if(tabs.length>=3){if(tabs[0].textContent!==d.live)tabs[0].textContent=d.live;if(tabs[1].textContent!==d.movies)tabs[1].textContent=d.movies;if(tabs[2].textContent!==d.series)tabs[2].textContent=d.series}
+    const cat=document.getElementById('category');if(cat?.options?.length&&cat.options[0].textContent!==d.allCategories)cat.options[0].textContent=d.allCategories;
+    const country=document.getElementById('country');if(country?.options?.length&&country.options[0].textContent!==d.allCountries)country.options[0].textContent=d.allCountries;
+    const folderHead=document.querySelector('.folder-heading');if(folderHead&&folderHead.textContent!==d.categories)folderHead.textContent=d.categories;
+    const countryHead=document.getElementById('countryFolderHeading');if(countryHead&&countryHead.textContent!==d.countries)countryHead.textContent=d.countries;
+    const list=document.getElementById('listTitle');if(list){const tab=window.state?.tab||document.querySelector('.tab.active')?.dataset?.tab;const next=tab==='movie'?d.movies:tab==='series'?d.series:d.channels;if(list.textContent!==next)list.textContent=next}
+    const more=document.getElementById('loadMore');if(more&&!more.disabled&&more.textContent!==d.loadMore)more.textContent=d.loadMore;
+    const empty=document.getElementById('empty');if(empty&&empty.textContent!==d.noResults)empty.textContent=d.noResults;
     const player=document.getElementById('nowPlaying');if(player&&!player.textContent.trim())player.textContent=d.player;
-    const close=document.getElementById('closePlayer');if(close)close.textContent=d.close;
-    const retry=document.getElementById('retryPlayback');if(retry)retry.textContent=d.retry;
-    const chat=document.querySelector('.chathead strong');if(chat)chat.textContent=d.chat;
+    const close=document.getElementById('closePlayer');if(close&&close.textContent!==d.close)close.textContent=d.close;
+    const retry=document.getElementById('retryPlayback');if(retry&&retry.textContent!==d.retry)retry.textContent=d.retry;
+    const chat=document.querySelector('.chathead strong');if(chat&&chat.textContent!==d.chat)chat.textContent=d.chat;
     const chatToggle=document.getElementById('chatToggle');if(chatToggle)chatToggle.textContent=chatToggle.getAttribute('aria-expanded')==='false'?d.showChat:d.hideChat;
-    const nick=document.getElementById('chatNickname');if(nick)nick.placeholder=d.nickname;
-    const msg=document.getElementById('chatMessage');if(msg)msg.placeholder=d.message;
-    const send=document.getElementById('chatSend');if(send)send.textContent=d.send;
-    const foot=document.querySelector('footer');if(foot)foot.textContent=d.footer;
+    const nick=document.getElementById('chatNickname');if(nick&&nick.placeholder!==d.nickname)nick.placeholder=d.nickname;
+    const msg=document.getElementById('chatMessage');if(msg&&msg.placeholder!==d.message)msg.placeholder=d.message;
+    const send=document.getElementById('chatSend');if(send&&send.textContent!==d.send)send.textContent=d.send;
+    const foot=document.querySelector('footer');if(foot&&foot.textContent!==d.footer)foot.textContent=d.footer;
   }
   function languageUi(){
     const host=document.querySelector('.topright');if(!host)return;let box=document.getElementById('jokLang');
