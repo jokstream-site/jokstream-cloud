@@ -143,7 +143,13 @@ async function load(){
 function resetSubtitles(){externalSubtitleUrls.forEach(u=>{try{URL.revokeObjectURL(u)}catch{}});externalSubtitleUrls=[];externalSubtitleTracks=[];const s=$('subtitleSelect');s.innerHTML='<option value="-1">الترجمة: لا توجد بعد</option><option value="__other__">🌐 بحث عن لغة أخرى...</option>'}
 async function searchExternalSubtitles(meta,languages='ar,en,es,fr'){
   if(!meta||(!meta.imdb_id&&!meta.parent_imdb_id&&!meta.query))return;
-  const q=new URLSearchParams();if(meta.imdb_id)q.set('imdb_id',String(meta.imdb_id).replace(/^0+/,''));if(meta.parent_imdb_id){q.set('parent_imdb_id',String(meta.parent_imdb_id).replace(/^0/,''));q.set('type','episode');if(meta.season)q.set('season_number',String(meta.season));if(meta.episode)q.set('episode_number',String(meta.episode));}else q.set('type','movie');q.set('languages',languages.split(',').map(x=>x.trim().toLowerCase()).filter(Boolean).sort().join(','));if(meta.query)q.set('query',meta.query);
+  const normalizeImdb=id=>String(id??'').trim().replace(/^tt/i,'').replace(/^0+/,'');
+  const q=new URLSearchParams();
+  if(meta.imdb_id)q.set('imdb_id',normalizeImdb(meta.imdb_id));
+  if(meta.parent_imdb_id){q.set('parent_imdb_id',normalizeImdb(meta.parent_imdb_id));q.set('type','episode');if(meta.season)q.set('season_number',String(meta.season));if(meta.episode)q.set('episode_number',String(meta.episode));}
+  else q.set('type','movie');
+  q.set('languages',languages.split(',').map(x=>x.trim().toLowerCase()).filter(Boolean).sort().join(','));
+  if(meta.query)q.set('query',meta.query);
   try{const data=await api('/api/subtitles?'+q.toString(),{timeout:15000});const list=arr(data.items);for(const item of list){const file=item.files?.[0];if(!file?.file_id)continue;const lang=String(item.language||'').toLowerCase();if(!externalSubtitleTracks.some(x=>x.file_id===file.file_id)){externalSubtitleTracks.push({file_id:file.file_id,language:lang,release:item.release||'',name:(lang||'??').toUpperCase()+' · '+(item.release||'OpenSubtitles')});}}
   }catch(e){console.warn('OpenSubtitles:',e.message)}
   setSubtitleOptions();
