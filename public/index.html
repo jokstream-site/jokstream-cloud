@@ -23,7 +23,7 @@ footer{padding:24px 0 42px;color:#687383;font-size:10px;text-align:center}
 @media(max-width:700px){.top{height:62px}.hero{min-height:380px;padding-top:45px}.hero h1{font-size:34px}.hero p{font-size:13px}.hero-actions{margin-top:18px}.toolbar{align-items:stretch}.tabs{width:100%;justify-content:space-between}.tab{flex:1;padding:8px 5px}.search{min-width:100%;order:2}.toolbar select{flex:1;min-width:0}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}.poster{height:215px}.playerbox{padding:8px}.playerstatus{width:100%;margin:0}.dialog{padding:15px}.stats{margin-top:15px}}
 @media(min-width:1100px){.grid{grid-template-columns:repeat(7,minmax(0,1fr))}.poster{height:245px}}
 </style>
-</head>
+<style id="jok-enhance-css">.jok-sticky-toolbar{position:sticky;top:72px;z-index:18;background:#07090df2;backdrop-filter:blur(16px);padding-inline:8px}.jok-lang{display:flex;align-items:center;gap:5px;background:#0e141d;border:1px solid #252d39;border-radius:8px;padding:3px 6px}.jok-lang select{background:transparent;color:#fff;border:0;outline:0;font-size:10px;font-weight:800}.jok-rtl .jok-sticky-toolbar{direction:rtl}@media(max-width:700px){.jok-sticky-toolbar{top:62px}.jok-lang{order:-1}.folder-area{margin-top:28px;padding-top:18px;border-top:1px solid #ffffff0b}.folder-grid{overflow:auto;flex-wrap:nowrap;padding-bottom:5px}.folder-card{white-space:nowrap}.sectionhead{margin-top:18px}.grid{scroll-margin-top:130px}}</style></head>
 <body>
 <div class="shell">
 <header class="top"><div class="brand">JOK<b>STREAM</b></div><div class="topright"><div class="health"><i class="dot" id="healthDot"></i><span id="healthText">جارٍ اختبار Cloudflare</span></div></div></header>
@@ -323,4 +323,4 @@ $('search').addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=
 load();
 })();
 </script>
-</body></html>
+<script src="/jok-enhance.js"></script>\n</body></html>
