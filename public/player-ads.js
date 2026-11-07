@@ -37,7 +37,7 @@
     const next = pendingStart;
     pendingStart = null;
     cleanupManager();
-    if (reason === 'error') setStatus('لا يوجد إعلان متاح — بدء المحتوى');
+    if (reason === 'error') setStatus('No ad available — starting content');
     if (typeof next === 'function') next();
   }
 
@@ -89,7 +89,7 @@
           active = true;
           if (box) box.classList.add('show');
           video?.pause();
-          setStatus('إعلان فيديو…');
+          setStatus('Video ad…');
         }
       );
       adsManager.addEventListener(
@@ -105,7 +105,7 @@
         () => {
           active = true;
           if (box) box.classList.add('show');
-          setStatus('إعلان فيديو…');
+          setStatus('Video ad…');
         }
       );
 
