@@ -71,7 +71,7 @@
   }
   function languageUi(){
     const host=document.querySelector('.topright');if(!host)return;let box=document.getElementById('jokLang');
-    if(!box){box=document.createElement('label');box.id='jokLang';box.className='jok-lang';box.innerHTML='<span aria-hidden="true">🌐</span><select aria-label="Language"><option value="en">EN</option><option value="es">ES</option><option value="fr">FR</option><option value="ar">AR</option></select>';host.appendChild(box);box.querySelector('select').addEventListener('change',e=>setLanguage(e.target.value));}
+    if(!box){box=document.createElement('label');box.id='jokLang';box.className='jok-lang';box.innerHTML='<span aria-hidden="true">🌐</span><select aria-label="Language"><option value="en">EN</option><option value="es">ES</option><option value="fr">FR</option><option value="ar">AR</option></select>';host.insertBefore(box,host.firstChild);box.querySelector('select').addEventListener('change',e=>setLanguage(e.target.value));}
     box.querySelector('select').value=lang;
   }
   function setLanguage(next){
