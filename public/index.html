@@ -90,25 +90,27 @@ function editDistance(a,b){
 }
 function searchScore(item,query){
   const q=normalizeSearch(query);if(!q)return 1;
-  const fields=[itemName(item),item.tvg_name,item.epg_channel_id,item.tvg_id,item.stream_display_name,item.category_name].filter(Boolean).map(normalizeSearch);
-  const hay=fields.join(' ');
-  if(fields.some(v=>v===q))return 100;
-  if(fields.some(v=>v.startsWith(q)))return 90;
-  if(hay.includes(q))return 80;
-  const wanted=q.split(' ').filter(Boolean),tokens=hay.split(' ');
-  let total=0;
-  for(const word of wanted){
-    let best=0;
-    for(const token of tokens){
-      if(token===word){best=10;break}
-      if(token.startsWith(word)||word.startsWith(token)){best=Math.max(best,7);continue}
-      const distance=editDistance(word,token),limit=word.length<=4?1:2;
-      if(distance<=limit)best=Math.max(best,5-distance);
+  const fields=[itemName(item),item.title,item.name,item.stream_name,item.stream_display_name,item.tvg_name].filter(Boolean).map(normalizeSearch);
+  const wanted=q.split(' ').filter(Boolean);
+  let bestScore=0;
+  for(const field of fields){
+    if(!field)continue;
+    if(field===q)return 100;
+    if(field.startsWith(q))bestScore=Math.max(bestScore,95);
+    else if(field.includes(q))bestScore=Math.max(bestScore,90);
+    const tokens=field.split(' ').filter(Boolean);
+    if(wanted.length>1){
+      const matched=wanted.filter(word=>tokens.some(token=>token===word||token.startsWith(word)||word.startsWith(token)));
+      if(matched.length===wanted.length)bestScore=Math.max(bestScore,82);
+      continue;
     }
-    if(!best)return 0;
-    total+=best;
+    const word=wanted[0];
+    if(!word)continue;
+    if(tokens.some(token=>token===word))bestScore=Math.max(bestScore,88);
+    else if(tokens.some(token=>token.startsWith(word)||word.startsWith(token)))bestScore=Math.max(bestScore,76);
+    else if(word.length>=4&&tokens.some(token=>editDistance(word,token)<=1))bestScore=Math.max(bestScore,60);
   }
-  return total;
+  return bestScore;
 }
 function itemName(x){return first(x.name,x.title,x.stream_name,x.stream_display_name,x.tvg_name,'Untitled')}
 function itemCat(x){return String(first(x.category_id,x.categoryId,''))}
@@ -144,7 +146,14 @@ async function load(){
     showNotice('تعذر تحميل Channels: '+e.message,true);
   }
 }
-function resetSubtitles(){externalSubtitleUrls.forEach(u=>{try{URL.revokeObjectURL(u)}catch{}});externalSubtitleUrls=[];externalSubtitleTracks=[];const s=$('subtitleSelect');s.innerHTML='<option value="-1">Subtitles: none yet</option><option value="__other__">🌐 Search another language…</option>'}
+function resetSubtitles(){
+  externalSubtitleUrls.forEach(u=>{try{URL.revokeObjectURL(u)}catch{}});
+  externalSubtitleUrls=[];
+  externalSubtitleTracks=[];
+  document.querySelectorAll('video track[data-jok-external-subtitle]').forEach(t=>t.remove());
+  const s=$('subtitleSelect');
+  s.innerHTML='<option value="-1">Subtitles: none yet</option><option value="__other__">🌐 Search another language…</option>';
+}
 async function searchExternalSubtitles(meta,languages='ar,en,es,fr'){
   if(!meta||(!meta.imdb_id&&!meta.parent_imdb_id&&!meta.query))return;
   const normalizeImdb=id=>String(id??'').trim().replace(/^tt/i,'').replace(/^0+/,'');
@@ -159,8 +168,24 @@ async function searchExternalSubtitles(meta,languages='ar,en,es,fr'){
   setSubtitleOptions();
 }
 async function loadExternalSubtitle(fileId,label){
-  const blob=new Blob([await fetch(API+'/api/subtitles/download?file_id='+encodeURIComponent(fileId)).then(r=>{if(!r.ok)throw new Error('Could not load subtitles');return r.text()})],{type:'text/vtt;charset=utf-8'});
-  const url=URL.createObjectURL(blob);externalSubtitleUrls.push(url);const track=$('video').addTextTrack('subtitles',label,'');track.src=url;track.mode='showing';for(const t of $('video').textTracks)if(t!==track)t.mode='disabled';playbackStatus('Subtitles: '+label);
+  const response=await fetch(API+'/api/subtitles/download?file_id='+encodeURIComponent(fileId),{cache:'no-store'});
+  if(!response.ok)throw new Error('Could not load subtitles');
+  const text=await response.text();
+  if(!/^WEBVTT\\s/i.test(text.trimStart()))throw new Error('Subtitle format is not WebVTT');
+  const url=URL.createObjectURL(new Blob([text],{type:'text/vtt;charset=utf-8'}));
+  externalSubtitleUrls.push(url);
+  document.querySelectorAll('video track[data-jok-external-subtitle]').forEach(t=>t.remove());
+  const track=document.createElement('track');
+  track.kind='subtitles';
+  track.label=label;
+  track.srclang=String(label||'').slice(0,5).toLowerCase()||'und';
+  track.src=url;
+  track.dataset.jokExternalSubtitle='1';
+  track.default=true;
+  $('video').appendChild(track);
+  for(const t of $('video').textTracks)t.mode='disabled';
+  track.track.mode='showing';
+  playbackStatus('Subtitles: '+label);
 }
 
 function setSubtitleOptions(){const s=$('subtitleSelect');const hlsTracks=state.hls&&Array.isArray(state.hls.subtitleTracks)?state.hls.subtitleTracks:[];const nativeTracks=!hlsTracks.length?[...$('video').textTracks]:[];const external=externalSubtitleTracks.slice();const hlsOptions=hlsTracks.map((t,i)=>'<option value="hls:'+i+'">'+safe(t.name||t.lang||('مسار '+(i+1)))+'</option>').join('');const nativeOptions=nativeTracks.map((t,i)=>'<option value="native:'+i+'">'+safe(t.label||t.language||('مسار '+(i+1)))+'</option>').join('');const externalOptions=external.map((t,i)=>'<option value="ext:'+i+'">'+safe(t.name)+'</option>').join('');const count=hlsTracks.length+nativeTracks.length+external.length;s.innerHTML='<option value="-1">Detected subtitle tracks: '+count+'</option>'+hlsOptions+nativeOptions+externalOptions+'<option value="__other__">🌐 Search another language…</option>';}
@@ -302,7 +327,7 @@ function playUrl(url,title,options={}){
   $('playerStatus').textContent='Connecting…';
   $('playerBox').classList.add('show');
   $('playerBox').scrollIntoView({behavior:'smooth',block:'start'});
-  const startContent=()=>{if(!state.activeStream||state.activeStream.seq!==stream.seq)return;startPlaybackAttempt(stream);if(stream.options?.subtitleMeta&&!stream.live)searchExternalSubtitles(stream.options.subtitleMeta)};
+  const startContent=()=>{if(!state.activeStream||state.activeStream.seq!==stream.seq)return;startPlaybackAttempt(stream);if(stream.options?.subtitleMeta&&!stream.live)searchExternalSubtitles(stream.options.subtitleMeta).catch(e=>console.warn('OpenSubtitles search:',e));};
   if(window.JokAds?.playPreRoll)window.JokAds.playPreRoll({title,live:stream.live},startContent);else startContent();
   joinChannelChat(stream).catch(error=>{chatStatus('Could not open chat');console.warn(error)});
 }
