@@ -12,6 +12,8 @@
   let pendingStart = null;
   let active = false;
   let finishing = false;
+  let skipButton = null;
+  let skipTimer = null;
 
   const $ = id => document.getElementById(id);
 
@@ -20,7 +22,53 @@
     if (el && active) el.textContent = text;
   }
 
+  function clearSkipUi() {
+    if (skipTimer) { clearInterval(skipTimer); skipTimer = null; }
+    if (skipButton) { skipButton.remove(); skipButton = null; }
+  }
+
+  function showSkipUi() {
+    clearSkipUi();
+    const box = $('adContainer');
+    if (!box) return;
+    skipButton = document.createElement('button');
+    skipButton.type = 'button';
+    skipButton.textContent = 'Skip ad in 7';
+    Object.assign(skipButton.style, {
+      position:'absolute', right:'12px', bottom:'12px', zIndex:'20',
+      border:'1px solid #ffffff55', background:'#000b', color:'#fff',
+      borderRadius:'7px', padding:'7px 11px', fontWeight:'800', fontSize:'12px',
+      cursor:'pointer', backdropFilter:'blur(6px)'
+    });
+    skipButton.disabled = true;
+    box.appendChild(skipButton);
+    let remaining = 7;
+    skipTimer = setInterval(() => {
+      if (!skipButton || !adsManager) { clearSkipUi(); return; }
+      const skippable = typeof adsManager.getAdSkippableState === 'function' && adsManager.getAdSkippableState();
+      remaining -= 1;
+      if (skippable) {
+        skipButton.disabled = false;
+        skipButton.textContent = 'Skip ad' + (remaining > 0 ? ' (' + remaining + ')' : '');
+        if (remaining <= 0) {
+          skipButton.textContent = 'Skip ad';
+        }
+      } else {
+        skipButton.textContent = 'Ad · ' + Math.max(0,remaining) + 's';
+      }
+      if (remaining <= 0) {
+        if (skippable) skipButton.textContent = 'Skip ad';
+        clearInterval(skipTimer); skipTimer = null;
+      }
+    }, 1000);
+    skipButton.addEventListener('click', () => {
+      if (!adsManager) return;
+      try { if (adsManager.getAdSkippableState()) adsManager.skip(); } catch {}
+    });
+  }
+
   function cleanupManager() {
+    clearSkipUi();
     if (adsManager) {
       try { adsManager.destroy(); } catch {}
     }
