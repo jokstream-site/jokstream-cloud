@@ -198,7 +198,7 @@ async function searchExternalSubtitles(meta,languages='ar,en,es,fr'){
   }catch(e){console.warn('OpenSubtitles:',e.message)}
   setSubtitleOptions();
 }
-async function loadExternalSubtitle(fileId,label){
+async function loadExternalSubtitle(fileId,label,languageCode=''){
   const response=await fetch(API+'/api/subtitles/download?file_id='+encodeURIComponent(fileId),{cache:'no-store'});
   if(!response.ok)throw new Error('Could not load subtitles');
   const text=await response.text();
@@ -209,13 +209,15 @@ async function loadExternalSubtitle(fileId,label){
   const track=document.createElement('track');
   track.kind='subtitles';
   track.label=label;
-  track.srclang=String(label||'').slice(0,5).toLowerCase()||'und';
+  track.srclang=String(languageCode||'und').toLowerCase().replace(/[^a-z-]/g,'').slice(0,16)||'und';
   track.src=url;
   track.dataset.jokExternalSubtitle='1';
   track.default=true;
   $('video').appendChild(track);
   for(const t of $('video').textTracks)t.mode='disabled';
-  track.track.mode='showing';
+  track.addEventListener('load',()=>{for(const t of $('video').textTracks)t.mode='disabled';track.track.mode='showing'});
+  requestAnimationFrame(()=>{try{for(const t of $('video').textTracks)t.mode='disabled';track.track.mode='showing'}catch{}});
+  setTimeout(()=>{try{for(const t of $('video').textTracks)t.mode='disabled';track.track.mode='showing'}catch{}},500);
   playbackStatus('Subtitles: '+label);
 }
 
@@ -381,7 +383,7 @@ async function searchAcrossLoadedPages(){
   if(request===searchRequest&&tabNow===state.tab)await loadPage(tabNow,true,query).catch(()=>{});
   if(request===searchRequest&&tabNow===state.tab)render();
 }
-$('search').addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>searchAcrossLoadedPages().catch(()=>{}),280)});$('country').addEventListener('change',render);$('category').addEventListener('change',()=>{state.selectedCategories[state.tab]=$('category').value;loadPage(state.tab,true).catch(()=>{})});$('loadMore').addEventListener('click',()=>loadPage(state.tab,false).catch(()=>{}));$('subtitleAudit')?.addEventListener('click',()=>auditSubtitles());$('closePlayer').addEventListener('click',stopPlayer);$('closeModal').addEventListener('click',()=>$('modal').classList.remove('show'));$('modal').addEventListener('click',e=>{if(e.target===$('modal'))$('modal').classList.remove('show')});$('retryPlayback').addEventListener('click',()=>{if(state.activeStream){const s=state.activeStream;playUrl(s.url,s.title,s.options)}});$('subtitleSelect').addEventListener('change',async()=>{const v=$('subtitleSelect').value;if(v==='__other__'){const lang=prompt('Enter a language code such as de, it, or pt:');if(lang)await searchExternalSubtitles(state.activeStream?.options?.subtitleMeta,lang);return;}if(v.startsWith('ext:')){const t=externalSubtitleTracks[Number(v.slice(4))];if(t)await loadExternalSubtitle(t.file_id,t.name).catch(e=>playbackStatus(e.message));return;}if(v.startsWith('hls:')&&state.hls){state.hls.subtitleTrack=Number(v.slice(4));return;}if(v.startsWith('native:')){const idx=Number(v.slice(7));const tracks=$('video').textTracks;for(let i=0;i<tracks.length;i++)tracks[i].mode=i===idx?'showing':'disabled';return;}if(v==='-1'){if(state.hls)state.hls.subtitleTrack=-1;for(const t of $('video').textTracks)t.mode='disabled';}});
+$('search').addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>searchAcrossLoadedPages().catch(()=>{}),280)});$('country').addEventListener('change',render);$('category').addEventListener('change',()=>{state.selectedCategories[state.tab]=$('category').value;loadPage(state.tab,true).catch(()=>{})});$('loadMore').addEventListener('click',()=>loadPage(state.tab,false).catch(()=>{}));$('subtitleAudit')?.addEventListener('click',()=>auditSubtitles());$('closePlayer').addEventListener('click',stopPlayer);$('closeModal').addEventListener('click',()=>$('modal').classList.remove('show'));$('modal').addEventListener('click',e=>{if(e.target===$('modal'))$('modal').classList.remove('show')});$('retryPlayback').addEventListener('click',()=>{if(state.activeStream){const s=state.activeStream;playUrl(s.url,s.title,s.options)}});$('subtitleSelect').addEventListener('change',async()=>{const v=$('subtitleSelect').value;if(v==='__other__'){const lang=prompt('Enter a language code such as de, it, or pt:');if(lang)await searchExternalSubtitles(state.activeStream?.options?.subtitleMeta,lang);return;}if(v.startsWith('ext:')){const t=externalSubtitleTracks[Number(v.slice(4))];if(t)await loadExternalSubtitle(t.file_id,t.name,t.language).catch(e=>playbackStatus(e.message));return;}if(v.startsWith('hls:')&&state.hls){state.hls.subtitleTrack=Number(v.slice(4));return;}if(v.startsWith('native:')){const idx=Number(v.slice(7));const tracks=$('video').textTracks;for(let i=0;i<tracks.length;i++)tracks[i].mode=i===idx?'showing':'disabled';return;}if(v==='-1'){if(state.hls)state.hls.subtitleTrack=-1;for(const t of $('video').textTracks)t.mode='disabled';}});
 load();
 })();
 </script>
