@@ -293,7 +293,8 @@ function startPlaybackAttempt(stream){
   v.ontimeupdate=()=>{if(state.activeStream&&state.activeStream.seq===seq&&stream.playing){const ahead=window.JokBufferPolicy?Math.floor(JokBufferPolicy.secondsAhead(v)):0;playbackStatus('Playing · buffer '+ahead+' sec')}};
   v.onplaying=finishPlaying;
   v.onerror=()=>{if(!state.activeStream||state.activeStream.seq!==seq)return; failPlayback(stream,'media')};
-  state.playTimer=setTimeout(()=>{if(state.activeStream&&state.activeStream.seq===seq&&!stream.playing)failPlayback(stream,'timeout')},15000);
+  const startupTimeout=stream.live?30000:45000;
+  state.playTimer=setTimeout(()=>{if(state.activeStream&&state.activeStream.seq===seq&&!stream.playing){playbackStatus('Still connecting — keeping the current attempt');state.playTimer=setTimeout(()=>{if(state.activeStream&&state.activeStream.seq===seq&&!stream.playing)failPlayback(stream,'timeout')},15000)}},startupTimeout);
 
   if(mode==='ts'&&window.mpegts&&mpegts.isSupported()){
     state.tsPlayer=mpegts.createPlayer({type:'mpegts',isLive:true,url:mediaUrl},{enableWorker:true,liveBufferLatencyChasing:true,liveBufferLatencyMaxLatency:8,liveBufferLatencyMinRemain:2});
@@ -307,8 +308,9 @@ function startPlaybackAttempt(stream){
   const isHls=/\.m3u8(?:$|\?)/i.test(mediaUrl);
   if(isHls&&window.Hls&&Hls.isSupported()){
     const HlsBase=window.Hls;
-    const HlsWithP2P=window.p2pml?.hlsjs?.HlsJsP2PEngine?.injectMixin(HlsBase)||HlsBase;
-    state.hls=new HlsWithP2P(window.JokBufferPolicy?JokBufferPolicy.config({live:stream.live,p2p:{core:{swarmId:'jokstream:'+stream.id}}}):{enableWorker:true,lowLatencyMode:false,maxBufferLength:stream.live?32:90,liveSyncDurationCount:3,backBufferLength:stream.live?18:90,enableWebVTT:true,renderTextTracksNatively:true,p2p:{core:{swarmId:'jokstream:'+stream.id}}});
+    // Stability-first: keep the native HLS.js path for the first playback.
+    // P2P can be re-enabled later only after the source is proven stable.
+    state.hls=new HlsBase(window.JokBufferPolicy?JokBufferPolicy.config({live:stream.live,p2p:{core:{swarmId:'jokstream:'+stream.id}}}):{enableWorker:true,lowLatencyMode:false,maxBufferLength:stream.live?32:90,liveSyncDurationCount:3,backBufferLength:stream.live?18:90,enableWebVTT:true,renderTextTracksNatively:true,p2p:{core:{swarmId:'jokstream:'+stream.id}}});
     if(state.hls.p2pEngine){
       state.hls.p2pEngine.addEventListener('onPeerConnect',()=>playbackStatus('P2P Connected · البث يعمل'));
       state.hls.p2pEngine.addEventListener('onPeerClose',()=>playbackStatus('P2P disconnected · native source active'));
@@ -316,8 +318,12 @@ function startPlaybackAttempt(stream){
     }
     state.hls.loadSource(mediaUrl);
     state.hls.attachMedia(v);
-    state.liveResilienceStop=window.JokLiveResilience?.attach(state.hls,v,{live:true,onStatus:msg=>{if(state.activeStream&&state.activeStream.seq===seq&&stream.playing)playbackStatus(msg)}})||null;
-    state.hls.on(Hls.Events.MANIFEST_PARSED,()=>{setSubtitleOptions();playbackStatus('Loaded HLS — بدء التشغيل');v.play().catch(()=>playbackStatus('Loaded — press play'))});
+    state.hls.on(Hls.Events.MANIFEST_PARSED,()=>{
+      setSubtitleOptions();
+      if(stream.live) state.liveResilienceStop=window.JokLiveResilience?.attach(state.hls,v,{live:true,onStatus:msg=>{if(state.activeStream&&state.activeStream.seq===seq&&stream.playing)playbackStatus(msg)}})||null;
+      playbackStatus('Loaded HLS — starting playback');
+      v.play().catch(()=>playbackStatus('Loaded — press play'));
+    });
     ['AUDIO_TRACKS_UPDATED','SUBTITLE_TRACKS_UPDATED','AUDIO_TRACK_SWITCHED','SUBTITLE_TRACK_SWITCH'].forEach(ev=>{if(Hls.Events[ev])state.hls.on(Hls.Events[ev],setSubtitleOptions)});
     state.hls.on(Hls.Events.ERROR,(_,data)=>{
       if(!state.activeStream||state.activeStream.seq!==seq||!data?.fatal)return;
