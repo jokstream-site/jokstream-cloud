@@ -117,3 +117,22 @@ const base={'مباشر':'live','أفلام':'movies','مسلسلات':'series',
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
   window.JokEnhance={setLanguage,getLanguage:()=>lang};
 })();
+
+/* Premium navigation and PWA layer */
+(()=>{const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function syncNav(tab){document.querySelectorAll('[data-jok-nav]').forEach(b=>b.classList.toggle('active',b.dataset.jokNav===tab))}
+function navigate(a){if(a==='home'){window.scrollTo({top:0,behavior:'smooth'});return}if(a==='search'){const x=document.getElementById('search');x?.focus();x?.scrollIntoView({behavior:'smooth',block:'center'});return}if(['live','movie','series'].includes(a)){document.querySelector('.tab[data-tab="'+a+'"]')?.click();syncNav(a);document.querySelector('.toolbar')?.scrollIntoView({behavior:'smooth',block:'start'})}}
+function side(label,icon,action,active){const b=document.createElement('button');b.type='button';b.className='jok-side-btn'+(active?' active':'');b.dataset.jokNav=action;b.innerHTML='<span class="jok-side-icon">'+icon+'</span><span>'+esc(label)+'</span>';b.onclick=()=>navigate(action);return b}
+let deferred=null;
+function hideInstall(){document.querySelectorAll('.jok-install,.jok-install-banner').forEach(x=>x.classList.remove('show'))}
+function install(){if(deferred){deferred.prompt();deferred.userChoice?.finally(()=>{deferred=null;hideInstall()});return}if(location.protocol==='https:')document.querySelector('.jok-install-banner')?.classList.add('show')}
+function build(){document.body.classList.add('jok-premium');if(!document.querySelector('.jok-sidebar')){const s=document.createElement('aside');s.className='jok-sidebar';s.innerHTML='<div class="jok-sidebar-brand">JOK<b>STREAM</b></div><div class="jok-sidebar-label">Browse</div><nav class="jok-side-nav"></nav><div class="jok-side-bottom"><strong>JokStream App</strong><span>Install the web app on your phone for a faster app-like experience.</span><button class="jok-side-btn" data-jok-install="1" style="margin-top:10px"><span class="jok-side-icon">⌄</span><span>Install app</span></button></div>';const n=s.querySelector('.jok-side-nav');n.append(side('Home','⌂','home',true),side('Live','◉','live'),side('Movies','▣','movie'),side('Series','▤','series'),side('Search','⌕','search'));s.querySelector('[data-jok-install]').onclick=install;document.body.prepend(s)}
+if(!document.querySelector('.jok-bottom-nav')){const n=document.createElement('nav');n.className='jok-bottom-nav';[['⌂','Home','home'],['◉','Live','live'],['▣','Movies','movie'],['▤','Series','series'],['⌕','Search','search']].forEach(x=>{const b=document.createElement('button');b.type='button';b.dataset.jokNav=x[2];b.innerHTML='<span class="jok-bottom-icon">'+x[0]+'</span><span>'+x[1]+'</span>';b.onclick=()=>navigate(x[2]);n.append(b)});document.body.append(n)}
+const host=document.querySelector('.topright');if(host&&!document.getElementById('jokInstall')){const b=document.createElement('button');b.id='jokInstall';b.className='jok-install';b.textContent='Install app';b.onclick=install;host.prepend(b)}
+if(!document.querySelector('.jok-install-banner')){const b=document.createElement('div');b.className='jok-install-banner';b.innerHTML='<div><strong>Install JokStream</strong><span>Use JokStream like a native app on your phone.</span></div><button type="button">Install</button>';b.querySelector('button').onclick=install;document.body.append(b)}
+}
+function hero(){const h=document.querySelector('.hero'),img=document.querySelector('#catalog .poster img');if(h&&(img?.currentSrc||img?.src))h.style.setProperty('--hero-image','url("'+(img.currentSrc||img.src).replace(/"/g,'\\\"')+'")')}
+function init(){build();hero();const c=document.getElementById('catalog');if(c){const m=new MutationObserver(()=>{clearTimeout(m.t);m.t=setTimeout(hero,120)});m.observe(c,{childList:true,subtree:true})}syncNav(document.querySelector('.tab.active')?.dataset.tab||'live');window.JokPremium={install}}
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;document.querySelectorAll('.jok-install').forEach(x=>x.classList.add('show'));document.querySelector('.jok-install-banner')?.classList.add('show')});
+window.addEventListener('appinstalled',hideInstall);if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+})();
