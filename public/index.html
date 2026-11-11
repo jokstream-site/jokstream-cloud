@@ -76,7 +76,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.91.0/dist/umd/supabase.min.js"></script>
 <script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js"></script>
 <script src="/player-ads.js"></script>
-<script src="/player-buffer.js"></script>
+<script src="/player-buffer.js"></script><script src="/player-resilience.js"></script>
 <script>
 (() => {
 const API='https://jokstream-api.abdonarjah.workers.dev';
@@ -283,7 +283,7 @@ function playbackStatus(msg){$('playerStatus').textContent=msg}
 function startPlaybackAttempt(stream){
   const seq=stream.seq, attempt=stream.attempt;
   clearPlayTimer();
-  if(state.hls){try{state.hls.destroy()}catch{} state.hls=null}
+  if(state.liveResilienceStop){try{state.liveResilienceStop()}catch{} state.liveResilienceStop=null}if(state.hls){try{state.hls.destroy()}catch{} state.hls=null}
   if(state.tsPlayer){try{state.tsPlayer.destroy()}catch{} state.tsPlayer=null}
   const v=$('video'); v.pause(); v.removeAttribute('src'); v.load(); resetSubtitles();
   const mode=stream.mode;
@@ -316,6 +316,7 @@ function startPlaybackAttempt(stream){
     }
     state.hls.loadSource(mediaUrl);
     state.hls.attachMedia(v);
+    state.liveResilienceStop=window.JokLiveResilience?.attach(state.hls,v,{live:true,onStatus:msg=>{if(state.activeStream&&state.activeStream.seq===seq&&stream.playing)playbackStatus(msg)}})||null;
     state.hls.on(Hls.Events.MANIFEST_PARSED,()=>{setSubtitleOptions();playbackStatus('Loaded HLS — بدء التشغيل');v.play().catch(()=>playbackStatus('Loaded — press play'))});
     ['AUDIO_TRACKS_UPDATED','SUBTITLE_TRACKS_UPDATED','AUDIO_TRACK_SWITCHED','SUBTITLE_TRACK_SWITCH'].forEach(ev=>{if(Hls.Events[ev])state.hls.on(Hls.Events[ev],setSubtitleOptions)});
     state.hls.on(Hls.Events.ERROR,(_,data)=>{
