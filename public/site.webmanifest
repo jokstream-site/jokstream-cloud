@@ -1,9 +1,20 @@
 {
-  "name": "JokStream",
-  "short_name": "JokStream",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#07090d",
-  "theme_color": "#090f18",
-  "description": "JokStream live channels, movies and series"
+  "name":"JokStream",
+  "short_name":"JokStream",
+  "start_url":"/",
+  "scope":"/",
+  "display":"standalone",
+  "display_override":["window-controls-overlay","standalone","minimal-ui"],
+  "orientation":"any",
+  "background_color":"#05070b",
+  "theme_color":"#090f18",
+  "description":"JokStream live channels, movies and series",
+  "icons":[
+    {"src":"/icons/jokstream.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ],
+  "shortcuts":[
+    {"name":"Live","short_name":"Live","url":"/?tab=live"},
+    {"name":"Movies","short_name":"Movies","url":"/?tab=movie"},
+    {"name":"Series","short_name":"Series","url":"/?tab=series"}
+  ]
 }
