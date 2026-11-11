@@ -1,5 +1,5 @@
-const CACHE_VERSION='jokstream-media-v1';
-const APP_CACHE='jokstream-shell-v1';
+const CACHE_VERSION='jokstream-media-v2';
+const APP_CACHE='jokstream-shell-v2';
 const MEDIA_RE=/\.(?:m3u8|ts|m4s|aac|mp4)(?:$|\?)/i;
 async function trim(cache,max=32){const keys=await cache.keys();if(keys.length<=max)return;for(const key of keys.slice(0,keys.length-max))await cache.delete(key);}
 self.addEventListener('install',event=>{event.waitUntil(caches.open(APP_CACHE).then(c=>c.addAll(['/','/index.html','/jok-enhance.js','/player-buffer.js'])).catch(()=>{}));self.skipWaiting()});
