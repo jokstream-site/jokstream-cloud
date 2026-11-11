@@ -234,7 +234,7 @@ function setSubtitleOptions(){
   s.innerHTML='<option value="-1">Subtitles: Off</option>'+hlsSubOptions+nativeSubOptions+externalOptions+'<option value="__other__">🌐 Search another language…</option>';
   a.innerHTML='<option value="-1">Audio: default</option>'+audioOptions;
 }
-function auditSubtitles(){
+async function auditSubtitles(){
   const button=$('subtitleAudit'),report=$('subtitleAuditReport');
   button.disabled=true;button.textContent='Checking…';report.hidden=false;
   report.textContent='يتم فحص عينة of 10 أفلام و10 Seriesات of بيانات المزود. قد يستغرق ذلك بعض الوقت...';
