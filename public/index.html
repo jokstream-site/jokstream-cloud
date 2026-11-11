@@ -360,6 +360,7 @@ function stopPlayer(){
   leaveChannelChat();
   clearPlayTimer();
   state.playSeq++;
+  if(state.liveResilienceStop){try{state.liveResilienceStop()}catch{} state.liveResilienceStop=null}
   if(state.hls){try{state.hls.destroy()}catch{} state.hls=null}
   if(state.tsPlayer){try{state.tsPlayer.destroy()}catch{} state.tsPlayer=null}
   const v=$('video');v.pause();v.onplaying=null;v.ontimeupdate=null;v.onerror=null;v.removeAttribute('src');v.load();
