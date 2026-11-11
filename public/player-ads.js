@@ -14,6 +14,7 @@
   let finishing = false;
   let skipButton = null;
   let skipTimer = null;
+  let adRequestTimer = null;
 
   const $ = id => document.getElementById(id);
 
@@ -23,6 +24,7 @@
   }
 
   function clearSkipUi() {
+    if (adRequestTimer) { clearTimeout(adRequestTimer); adRequestTimer = null; }
     if (skipTimer) { clearInterval(skipTimer); skipTimer = null; }
     if (skipButton) { skipButton.remove(); skipButton = null; }
   }
@@ -185,6 +187,7 @@
       request.setAdWillAutoPlay?.(true);
       request.setAdWillPlayMuted?.(false);
       adsLoader.requestAds(request);
+      adRequestTimer = setTimeout(() => { if (pendingStart && !active) resumeContent('error'); }, 9000);
     } catch (error) {
       console.warn('JokStream VAST request failed', error);
       resumeContent('error');
@@ -216,10 +219,10 @@
 
   window.JokAds = {
     playPreRoll(meta, onReady) {
-      if (!initializedByGesture) {
-        onReady();
-        return;
-      }
+      // The player click itself is a valid user gesture. Initialize IMA here too,
+      // instead of depending only on an earlier pointerdown listener.
+      if (!initializedByGesture) armFromGesture();
+      if (!initializedByGesture) { onReady(); return; }
       requestAd(meta, onReady);
     },
     armFromGesture,
