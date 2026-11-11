@@ -146,6 +146,7 @@
         () => {
           active = true;
           if (box) box.classList.add('show');
+          showSkipUi();
           setStatus('Video ad…');
         }
       );
