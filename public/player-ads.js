@@ -3,7 +3,7 @@
  * This file only wires the supplied VAST feed into the existing player.
  */
 (() => {
-  const VAST_TAG = 'https://smooth-survey.com/dSm.FfzodDGsNcvFZzGfUY/_e/mm9MuyZ/UvlxkdPZTYcb2kMYDtYl1/MGDikqtDNczqYvw/N/jaU/xdMewS';
+  const VAST_TAG = 'https://smooth-survey.com/d/m.Fcz/dNGbNdvZZnGlUF/FePmQ9/ugZsU-lCkuPBTtcz2JMKDsY/1uM/DzkCtlN/zzY-wKNWjAUvxDMXwS';
 
   let adDisplayContainer = null;
   let adsLoader = null;
@@ -35,7 +35,7 @@
     if (!box) return;
     skipButton = document.createElement('button');
     skipButton.type = 'button';
-    skipButton.textContent = 'Skip ad in 7';
+    skipButton.textContent = 'Skip ad when available';
     Object.assign(skipButton.style, {
       position:'absolute', right:'12px', bottom:'12px', zIndex:'20',
       border:'1px solid #ffffff55', background:'#000b', color:'#fff',
@@ -44,25 +44,16 @@
     });
     skipButton.disabled = true;
     box.appendChild(skipButton);
-    let remaining = 7;
     skipTimer = setInterval(() => {
       if (!skipButton || !adsManager) { clearSkipUi(); return; }
       const skippable = typeof adsManager.getAdSkippableState === 'function' && adsManager.getAdSkippableState();
-      remaining -= 1;
       if (skippable) {
         skipButton.disabled = false;
-        skipButton.textContent = 'Skip ad' + (remaining > 0 ? ' (' + remaining + ')' : '');
-        if (remaining <= 0) {
-          skipButton.textContent = 'Skip ad';
-        }
+        skipButton.textContent = 'Skip ad';
       } else {
-        skipButton.textContent = 'Ad · ' + Math.max(0,remaining) + 's';
+        skipButton.textContent = 'Skip when available';
       }
-      if (remaining <= 0) {
-        if (skippable) skipButton.textContent = 'Skip ad';
-        clearInterval(skipTimer); skipTimer = null;
-      }
-    }, 1000);
+    }, 500);
     skipButton.addEventListener('click', () => {
       if (!adsManager) return;
       try { if (adsManager.getAdSkippableState()) adsManager.skip(); } catch {}
