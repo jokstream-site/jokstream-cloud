@@ -5,7 +5,7 @@
   function first(){for(var i=0;i<arguments.length;i++){if(arguments[i]!==undefined&&arguments[i]!==null&&arguments[i]!=='')return arguments[i];}return '';}
   function list(v){if(Array.isArray(v))return v;if(v&&Array.isArray(v.items))return v.items;return [];}
   function itemName(x){return String(first(x.name,x.title,x.stream_name,x.stream_display_name,'Untitled'));}
-  function itemImage(x){return String(first(x.cover_big,x.cover,x.movie_image,x.stream_icon,x.icon,''));}
+  function itemImage(x){const raw=String(first(x.cover_big,x.cover,x.movie_image,x.stream_icon,x.icon,'')||'').trim();if(!raw)return '';try{const u=new URL(raw,location.href),apiOrigin=new URL(API).origin;if(u.origin===apiOrigin)return u.href;return API+'/proxy/image?url='+encodeURIComponent(u.href);}catch{return '';}}
   function itemId(x){return String(first(x.stream_id,x.series_id,x.id,''));}
   function itemRating(x){return Number(first(x.rating,x.rating_5,x.rating_4_5,0))||0;}
   function itemAdded(x){return Number(x.added||0)||0;}
