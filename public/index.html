@@ -429,6 +429,17 @@ function stopPlayer(){
   const v=$('video');v.pause();v.onplaying=null;v.ontimeupdate=null;v.onerror=null;v.removeAttribute('src');v.load();
   $('playerBox').classList.remove('show');state.activeStream=null;resetSubtitles();
 }
+function assertJokStreamUrl(url){
+  try{
+    const u=new URL(url,location.href);
+    const apiOrigin=new URL(API).origin;
+    if(u.origin!==apiOrigin)throw new Error('Blocked direct provider playback URL');
+    return u.href;
+  }catch(e){
+    if(e?.message==='Blocked direct provider playback URL')throw e;
+    throw new Error('Invalid JokStream playback URL');
+  }
+}
 function playUrl(url,title,options={}){
   stopPlayer();
   const stream={url,title,options,live:!!options.live,id:options.id||'',mode:options.mode||(/\\.ts(?:$|\\?)/i.test(url)?'ts':'hls'),attempt:0,maxAttempts:3,playing:false,done:false,seq:++state.playSeq};
