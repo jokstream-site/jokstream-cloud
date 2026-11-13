@@ -43,9 +43,10 @@
 
   function card(x,tab){
     var n=itemName(x),im=itemImage(x),r=itemRating(x);
+    if(!im || !String(im).trim()) return '';
     return '<button class="jh-card" data-tab="'+esc(tab)+'" data-id="'+esc(itemId(x))+'" data-name="'+esc(n)+'"><div class="jh-poster">'+(im?'<img loading="lazy" src="'+esc(im)+'" alt="">':'')+(r?'<span class="jh-rate">★ '+r.toFixed(1)+'</span>':'')+'</div><div class="jh-title">'+esc(n)+'</div><div class="jh-meta2">'+esc(first(itemCategory(x),x.year,''))+'</div></button>';
   }
-  function section(title,items,tab){if(!items.length)return '';return '<section class="jh-section"><div class="jh-section-head"><h2>'+title+'</h2><span>'+items.length+' items</span></div><div class="jh-row">'+items.map(function(x){return card(x,tab);}).join('')+'</div></section>';}
+  function section(title,items,tab){items=items.filter(function(x){return String(itemImage(x)||'').trim();});if(!items.length)return '';return '<section class="jh-section"><div class="jh-section-head"><h2>'+title+'</h2><span>'+items.length+' items</span></div><div class="jh-row">'+items.map(function(x){return card(x,tab);}).join('')+'</div></section>';}
 
   var spotlight=[],spot=0,timer=null;
   function setSpot(n){
@@ -86,7 +87,7 @@
       api('/api/catalog?kind=series&page=1&limit=50&sort=recent'),
       api('/api/catalog?kind=live&page=1&limit=180&sort=recent')
     ]).then(function(data){
-      var ms=list(data[0]),ss=list(data[1]),ls=list(data[2]);
+      var ms=list(data[0]).filter(function(x){return String(itemImage(x)||'').trim();}),ss=list(data[1]).filter(function(x){return String(itemImage(x)||'').trim();}),ls=list(data[2]).filter(function(x){return String(itemImage(x)||'').trim();});
       spotlight=ms.filter(function(x){return itemImage(x);}).sort(function(a,b){return itemAdded(b)-itemAdded(a)||itemRating(b)-itemRating(a);}).slice(0,6);
       if(!spotlight.length)spotlight=ms.slice(0,6);
       var newest=ms.slice().sort(function(a,b){return itemAdded(b)-itemAdded(a);}).slice(0,12);
