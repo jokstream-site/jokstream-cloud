@@ -278,24 +278,68 @@ async function auditSubtitles(){
 }
 function clearPlayTimer(){if(state.playTimer){clearTimeout(state.playTimer);state.playTimer=null}}
 function playbackStatus(msg){$('playerStatus').textContent=msg}
-function startPlaybackAttempt(stream){
+async function detectStreamType(url, fallback){
+  try{
+    const res=await fetch(url,{method:'GET',headers:{Range:'bytes=0-1023',Accept:'*/*'},cache:'no-store'});
+    const ct=(res.headers.get('content-type')||'').toLowerCase();
+    const buf=new Uint8Array(await res.arrayBuffer());
+    const text=new TextDecoder().decode(buf.slice(0,512)).trim();
+    if(/#EXTM3U/i.test(text)||/mpegurl/i.test(ct)) return 'hls';
+    if(ct.includes('mpeg')||ct.includes('video/mp2t')) return 'ts';
+    if(ct.includes('video/')||ct.includes('audio/')) return 'progressive';
+    if(buf.length>=12){
+      const sig=new TextDecoder().decode(buf.slice(4,8));
+      if(sig==='ftyp') return 'progressive';
+    }
+    if(buf[0]===0x47) return 'ts';
+  }catch{}
+  return fallback||'hls';
+}
+async function startPlaybackAttempt(stream){
   const seq=stream.seq, attempt=stream.attempt;
   clearPlayTimer();
-  if(state.liveResilienceStop){try{state.liveResilienceStop()}catch{} state.liveResilienceStop=null}if(state.hls){try{state.hls.destroy()}catch{} state.hls=null}
+  if(state.liveResilienceStop){try{state.liveResilienceStop()}catch{} state.liveResilienceStop=null}
+  if(state.hls){try{state.hls.destroy()}catch{} state.hls=null}
   if(state.tsPlayer){try{state.tsPlayer.destroy()}catch{} state.tsPlayer=null}
   const v=$('video'); v.pause(); v.removeAttribute('src'); v.load(); resetSubtitles();
-  const mode=stream.mode;
-  const mediaUrl=mode==='ts'&&stream.tsUrl?stream.tsUrl:stream.url;
-  playbackStatus(mode==='ts'?'Loading MPEG-TS...':'Loading HLS (.m3u8)...');
-  const finishPlaying=()=>{if(!state.activeStream||state.activeStream.seq!==seq)return;clearPlayTimer();stream.playing=true;const ahead=window.JokBufferPolicy?Math.floor(JokBufferPolicy.secondsAhead(v)):0;playbackStatus('Playing · buffer '+ahead+' sec')};
-  v.ontimeupdate=()=>{if(state.activeStream&&state.activeStream.seq===seq&&stream.playing){const ahead=window.JokBufferPolicy?Math.floor(JokBufferPolicy.secondsAhead(v)):0;playbackStatus('Playing · buffer '+ahead+' sec')}};
-  v.onplaying=finishPlaying;
-  v.onerror=()=>{if(!state.activeStream||state.activeStream.seq!==seq)return; failPlayback(stream,'media')};
-  const startupTimeout=stream.live?30000:45000;
-  state.playTimer=setTimeout(()=>{if(state.activeStream&&state.activeStream.seq===seq&&!stream.playing){playbackStatus('Still connecting — keeping the current attempt');state.playTimer=setTimeout(()=>{if(state.activeStream&&state.activeStream.seq===seq&&!stream.playing)failPlayback(stream,'timeout')},15000)}},startupTimeout);
 
-  if(mode==='ts'&&window.mpegts&&mpegts.isSupported()){
-    state.tsPlayer=mpegts.createPlayer({type:'mpegts',isLive:true,cors:true,url:mediaUrl},{enableWorker:true,enableStashBuffer:false,liveBufferLatencyChasing:true,liveBufferLatencyMaxLatency:8,liveBufferLatencyMinRemain:2,seekType:'range',rangeLoadZeroStart:true,reuseRedirectedURL:true});
+  const hinted=stream.mode;
+  const mediaUrl=hinted==='ts'&&stream.tsUrl?stream.tsUrl:stream.url;
+  const detected=await detectStreamType(mediaUrl,hinted);
+  if(!state.activeStream||state.activeStream.seq!==seq)return;
+  stream.mode=detected;
+  playbackStatus(detected==='ts'?'Loading MPEG-TS...':detected==='hls'?'Loading HLS...':'Loading video…');
+
+  const finishPlaying=()=>{
+    if(!state.activeStream||state.activeStream.seq!==seq)return;
+    clearPlayTimer();stream.playing=true;
+    const ahead=window.JokBufferPolicy?Math.floor(JokBufferPolicy.secondsAhead(v)):0;
+    playbackStatus('Playing · buffer '+ahead+' sec')
+  };
+  v.ontimeupdate=()=>{if(state.activeStream&&state.activeStream.seq===seq&&stream.playing){
+    const ahead=window.JokBufferPolicy?Math.floor(JokBufferPolicy.secondsAhead(v)):0;
+    playbackStatus('Playing · buffer '+ahead+' sec')
+  }};
+  v.onplaying=finishPlaying;
+  v.onerror=()=>{if(state.activeStream&&state.activeStream.seq===seq)failPlayback(stream,'media')};
+  const startupTimeout=stream.live?30000:45000;
+  state.playTimer=setTimeout(()=>{
+    if(state.activeStream&&state.activeStream.seq===seq&&!stream.playing){
+      playbackStatus('Still connecting — keeping the current attempt');
+      state.playTimer=setTimeout(()=>{
+        if(state.activeStream&&state.activeStream.seq===seq&&!stream.playing)failPlayback(stream,'timeout')
+      },15000)
+    }
+  },startupTimeout);
+
+  if(detected==='ts'&&window.mpegts&&mpegts.isSupported()){
+    state.tsPlayer=mpegts.createPlayer(
+      {type:'mpegts',isLive:!!stream.live,cors:true,url:mediaUrl},
+      {enableWorker:true,enableStashBuffer:false,
+       liveBufferLatencyChasing:true,liveBufferLatencyMaxLatency:8,liveBufferLatencyMinRemain:2,
+       seekType:'range',rangeLoadZeroStart:true,reuseRedirectedURL:true,
+       lazyLoadMaxDuration:3,accurateSeek:false}
+    );
     state.tsPlayer.attachMediaElement(v);
     state.tsPlayer.on(mpegts.Events.ERROR,()=>failPlayback(stream,'ts'));
     state.tsPlayer.load();
@@ -303,52 +347,44 @@ function startPlaybackAttempt(stream){
     return;
   }
 
-  const isHls=/\.m3u8(?:$|\?)/i.test(mediaUrl);
-  const isProgressive=/\.(?:mp4|m4v|webm|mov|mkv|avi)(?:$|\?)/i.test(mediaUrl) || mode==='progressive';
-  if(isProgressive){
+  if(detected==='progressive'){
     v.src=mediaUrl;
     v.load();
-    playbackStatus('Loading video…');
     v.play().catch(()=>playbackStatus('Loaded — press play'));
     return;
   }
-  if(isHls&&window.Hls&&Hls.isSupported()){
+
+  if(detected==='hls'&&window.Hls&&Hls.isSupported()){
     const HlsBase=window.Hls;
-    // Stability-first: keep the native HLS.js path for the first playback.
-    // P2P can be re-enabled later only after the source is proven stable.
-    state.hls=new HlsBase(window.JokBufferPolicy?JokBufferPolicy.config({live:stream.live,p2p:{core:{swarmId:'jokstream:'+stream.id}}}):{enableWorker:true,lowLatencyMode:false,maxBufferLength:stream.live?32:90,liveSyncDurationCount:3,backBufferLength:stream.live?18:90,enableWebVTT:true,renderTextTracksNatively:true,p2p:{core:{swarmId:'jokstream:'+stream.id}}});
-    if(state.hls.p2pEngine){
-      state.hls.p2pEngine.addEventListener('onPeerConnect',()=>playbackStatus('P2P Connected · البث يعمل'));
-      state.hls.p2pEngine.addEventListener('onPeerClose',()=>playbackStatus('P2P disconnected · native source active'));
-      state.hls.p2pEngine.addEventListener('onPeerConnectError',()=>playbackStatus('P2P unavailable · native source active'));
-    }
+    state.hls=new HlsBase(window.JokBufferPolicy?JokBufferPolicy.config({
+      live:!!stream.live,p2p:{core:{swarmId:'jokstream:'+stream.id}}
+    }):{enableWorker:true,lowLatencyMode:false,maxBufferLength:stream.live?32:90,
+      liveSyncDurationCount:3,backBufferLength:stream.live?18:90,enableWebVTT:true,
+      renderTextTracksNatively:true});
     state.hls.loadSource(mediaUrl);
     state.hls.attachMedia(v);
     state.hls.on(Hls.Events.MANIFEST_PARSED,()=>{
       setSubtitleOptions();
-      if(stream.live) state.liveResilienceStop=window.JokLiveResilience?.attach(state.hls,v,{live:true,onStatus:msg=>{if(state.activeStream&&state.activeStream.seq===seq&&stream.playing)playbackStatus(msg)}})||null;
+      if(stream.live) state.liveResilienceStop=window.JokLiveResilience?.attach(state.hls,v,{
+        live:true,onStatus:msg=>{if(state.activeStream&&state.activeStream.seq===seq&&stream.playing)playbackStatus(msg)}
+      })||null;
       playbackStatus('Loaded HLS — starting playback');
       v.play().catch(()=>playbackStatus('Loaded — press play'));
     });
-    ['AUDIO_TRACKS_UPDATED','SUBTITLE_TRACKS_UPDATED','AUDIO_TRACK_SWITCHED','SUBTITLE_TRACK_SWITCH'].forEach(ev=>{if(Hls.Events[ev])state.hls.on(Hls.Events[ev],setSubtitleOptions)});
+    ['AUDIO_TRACKS_UPDATED','SUBTITLE_TRACKS_UPDATED','AUDIO_TRACK_SWITCHED','SUBTITLE_TRACK_SWITCH'].forEach(ev=>{
+      if(Hls.Events[ev])state.hls.on(Hls.Events[ev],setSubtitleOptions)
+    });
     state.hls.on(Hls.Events.ERROR,(_,data)=>{
       if(!state.activeStream||state.activeStream.seq!==seq||!data?.fatal)return;
       const code=Number(data?.response?.code||0);
-      playbackStatus(code?('HLS HTTP '+code+' — retrying…'):'خطأ شبكة HLS — retrying…');
+      playbackStatus(code?('HLS HTTP '+code+' — retrying…'):'HLS network error — retrying…');
       failPlayback(stream,'hls',data);
     });
     return;
   }
 
-  if(v.canPlayType('application/vnd.apple.mpegurl')){
-    v.src=stream.url;
-    v.addEventListener('loadedmetadata',()=>v.play().catch(()=>playbackStatus('Loaded — press play')),{once:true});
-    playbackStatus('HLS الأصلي: Connecting…');
-    return;
-  }
-
-  v.src=stream.url;
-  v.play().catch(()=>playbackStatus('اضغط تشغيل لبدء الviewersة'));
+  v.src=mediaUrl;
+  v.play().catch(()=>playbackStatus('اضغط تشغيل لبدء المشاهدة'));
 }
 function failPlayback(stream,reason,detail){
   if(!state.activeStream||state.activeStream.seq!==stream.seq||stream.done)return;
@@ -362,7 +398,7 @@ function failPlayback(stream,reason,detail){
     playbackStatus('Playback failed after 3 attempts — press Retry');
     return;
   }
-  const nextMode=stream.live?(stream.attempt===1?'ts':'hls'):'hls';
+  const nextMode=stream.live?(stream.attempt===1?'hls':'ts'):(stream.attempt===1?'progressive':'hls');
   stream.mode=nextMode;
   playbackStatus('Retry '+(stream.attempt+1)+' of '+stream.maxAttempts+'...');
   setTimeout(()=>{if(state.activeStream&&state.activeStream.seq===stream.seq&&!stream.done)startPlaybackAttempt(stream)},2000);
