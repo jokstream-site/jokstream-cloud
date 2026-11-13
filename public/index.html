@@ -338,15 +338,26 @@ async function startPlaybackAttempt(stream){
   if(detected==='ts'&&window.mpegts&&mpegts.isSupported()){
     state.tsPlayer=mpegts.createPlayer(
       {type:'mpegts',isLive:!!stream.live,cors:true,url:mediaUrl},
-      {enableWorker:true,enableStashBuffer:false,
-       liveBufferLatencyChasing:true,liveBufferLatencyMaxLatency:8,liveBufferLatencyMinRemain:2,
-       // The provider's live endpoint is a continuous MPEG-TS connection, not a seekable file.
-       // Avoid Range requests; the working IPTV client opens one plain GET and keeps it open.
+      {enableWorker:false,enableStashBuffer:true,
+       liveBufferLatencyChasing:true,liveBufferLatencyMaxLatency:10,liveBufferLatencyMinRemain:3,
+       // Match the provider's continuous MPEG-TS connection: one GET, no initial Range,
+       // and keep the transmuxer alive instead of forcing low-latency buffer starvation.
        seekType:'range',rangeLoadZeroStart:false,reuseRedirectedURL:false,
-       lazyLoad:false,accurateSeek:false}
+       lazyLoad:false,accurateSeek:false,fixAudioTimestampGap:true}
     );
     state.tsPlayer.attachMediaElement(v);
-    state.tsPlayer.on(mpegts.Events.ERROR,()=>failPlayback(stream,'ts'));
+    state.tsPlayer.on(mpegts.Events.MEDIA_INFO,(info)=>{
+      if(!state.activeStream||state.activeStream.seq!==seq)return;
+      const vcodec=info?.videoCodec||info?.videoCodecName||'';
+      const acodec=info?.audioCodec||info?.audioCodecName||'';
+      playbackStatus((vcodec||acodec)?('MPEG-TS · '+[vcodec,acodec].filter(Boolean).join(' + ')):'MPEG-TS · receiving data…');
+    });
+    state.tsPlayer.on(mpegts.Events.ERROR,(_,type,detail)=>{
+      if(!state.activeStream||state.activeStream.seq!==seq)return;
+      console.warn('JokStream MPEG-TS error',type,detail);
+      playbackStatus('MPEG-TS error · '+String(detail||type||'unknown'));
+      failPlayback(stream,'ts',{type,detail});
+    });
     state.tsPlayer.load();
     state.tsPlayer.play().catch(()=>playbackStatus('Loaded MPEG-TS — اضغط تشغيل'));
     return;
