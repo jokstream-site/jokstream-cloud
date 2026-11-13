@@ -295,7 +295,7 @@ function startPlaybackAttempt(stream){
   state.playTimer=setTimeout(()=>{if(state.activeStream&&state.activeStream.seq===seq&&!stream.playing){playbackStatus('Still connecting — keeping the current attempt');state.playTimer=setTimeout(()=>{if(state.activeStream&&state.activeStream.seq===seq&&!stream.playing)failPlayback(stream,'timeout')},15000)}},startupTimeout);
 
   if(mode==='ts'&&window.mpegts&&mpegts.isSupported()){
-    state.tsPlayer=mpegts.createPlayer({type:'mpegts',isLive:true,url:mediaUrl},{enableWorker:true,liveBufferLatencyChasing:true,liveBufferLatencyMaxLatency:8,liveBufferLatencyMinRemain:2});
+    state.tsPlayer=mpegts.createPlayer({type:'mpegts',isLive:true,cors:true,url:mediaUrl},{enableWorker:true,enableStashBuffer:false,liveBufferLatencyChasing:true,liveBufferLatencyMaxLatency:8,liveBufferLatencyMinRemain:2,seekType:'range',rangeLoadZeroStart:true,reuseRedirectedURL:true});
     state.tsPlayer.attachMediaElement(v);
     state.tsPlayer.on(mpegts.Events.ERROR,()=>failPlayback(stream,'ts'));
     state.tsPlayer.load();
