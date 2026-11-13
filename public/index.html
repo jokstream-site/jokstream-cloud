@@ -340,8 +340,10 @@ async function startPlaybackAttempt(stream){
       {type:'mpegts',isLive:!!stream.live,cors:true,url:mediaUrl},
       {enableWorker:true,enableStashBuffer:false,
        liveBufferLatencyChasing:true,liveBufferLatencyMaxLatency:8,liveBufferLatencyMinRemain:2,
-       seekType:'range',rangeLoadZeroStart:true,reuseRedirectedURL:true,
-       lazyLoadMaxDuration:3,accurateSeek:false}
+       // The provider's live endpoint is a continuous MPEG-TS connection, not a seekable file.
+       // Avoid Range requests; the working IPTV client opens one plain GET and keeps it open.
+       seekType:'range',rangeLoadZeroStart:false,reuseRedirectedURL:false,
+       lazyLoad:false,accurateSeek:false}
     );
     state.tsPlayer.attachMediaElement(v);
     state.tsPlayer.on(mpegts.Events.ERROR,()=>failPlayback(stream,'ts'));
