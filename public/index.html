@@ -305,7 +305,10 @@ async function startPlaybackAttempt(stream){
 
   const hinted=stream.mode;
   const mediaUrl=hinted==='ts'&&stream.tsUrl?stream.tsUrl:stream.url;
-  const detected=await detectStreamType(mediaUrl,hinted);
+  // Live channels already have a known MPEG-TS endpoint. Do not probe it: a live
+  // MPEG-TS response never ends, so awaiting arrayBuffer() can stall forever and
+  // also loses the user's click activation before video.play().
+  const detected=stream.live&&hinted==='ts'?'ts':await detectStreamType(mediaUrl,hinted);
   if(!state.activeStream||state.activeStream.seq!==seq)return;
   stream.mode=detected;
   playbackStatus(detected==='ts'?'Loading MPEG-TS...':detected==='hls'?'Loading HLS...':'Loading video…');
