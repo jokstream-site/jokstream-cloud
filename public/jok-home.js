@@ -19,7 +19,7 @@
   };
 
   const css = `
-  #jokHome{display:block;margin:18px 0 30px}
+  body.jok-premium .hero{display:none!important} body.jok-premium .brand:before,.jok-sidebar-brand:before{content:"";display:inline-block;width:26px;height:26px;margin-right:8px;vertical-align:-6px;background:linear-gradient(135deg,#ff1744,#ff5b73);clip-path:polygon(0 0,100% 50%,0 100%,0 78%,62% 50%,0 22%);filter:drop-shadow(0 0 9px #ff174488)} .jok-sidebar-brand:before{width:22px;height:22px} #jokHome{display:block;margin:18px 0 30px}
   .jh-quick{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin:14px 0 24px}
   .jh-quick button{border:1px solid #ffffff12;background:linear-gradient(145deg,#111722,#0a0f16);color:#eef2f8;border-radius:15px;padding:13px 10px;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:900;min-height:64px;box-shadow:0 12px 30px #0005}
   .jh-quick button:hover{border-color:#ff174466;transform:translateY(-2px)}
@@ -74,7 +74,7 @@
     const homeEl=document.createElement('section');homeEl.id='jokHome';
     homeEl.innerHTML='<div class="jh-hero"><div class="jh-hero-bg"></div><div class="jh-hero-content"><span class="jh-badge">🔥 JOKSTREAM SPOTLIGHT</span><h2>Loading your spotlight…</h2><div class="jh-meta"></div><div class="jh-hero-actions"><button class="jh-play">▶ Watch</button><button class="jh-info">More info</button></div><div class="jh-dots"></div></div></div><div class="jh-quick"><button data-jh-action="live"><span class="jh-icon">📺</span>Live TV</button><button data-jh-action="movie"><span class="jh-icon">🎬</span>Movies</button><button data-jh-action="series"><span class="jh-icon">📺</span>Series</button><button data-jh-action="sports"><span class="jh-icon">⚽</span>Sports</button><button data-jh-action="countries"><span class="jh-icon">🌍</span>Countries</button><button data-jh-action="search"><span class="jh-icon">🔎</span>Search</button></div><div id="jhSections"></div>';
     h.insertAdjacentElement('afterend',homeEl);
-    homeEl.querySelectorAll('[data-jh-action]').forEach(b=>b.onclick=()=>{const a=b.dataset.jhAction;if(a==='sports'){nav('live');const s=document.getElementById('search');if(s)s.value='sport';s?.dispatchEvent(new Event('input',{bubbles:true}));return}if(a==='countries'){nav('live');document.getElementById('country')?.focus();return}if(a==='search'){nav('live');document.getElementById('search')?.focus();return}nav(a)});
+    homeEl.querySelectorAll('[data-jh-action]').forEach(b=>b.onclick=()=>{const a=b.dataset.jhAction;if(a==='sports'){nav('live');setTimeout(()=>{const c=document.getElementById('category');if(c){const o=[...c.options].find(x=>/sport|sports|dazn|sky sport|bein/i.test(x.textContent));if(o){c.value=o.value;c.dispatchEvent(new Event('change',{bubbles:true}));return}}const s=document.getElementById('search');if(s){s.value='sport';s.dispatchEvent(new Event('input',{bubbles:true))}},250);return}if(a==='countries'){nav('live');document.getElementById('country')?.focus();return}if(a==='search'){nav('live');document.getElementById('search')?.focus();return}nav(a)});
   }
   let spotlight=[],spot=0,timer=null;
   function showSpot(i){
@@ -96,19 +96,19 @@
     sections.innerHTML='<section class="jh-section"><div class="jh-row">'+Array(7).fill('<div class="jh-skeleton"></div>').join('')+'</div></section>';
     try{
       const [movies,series,live]=await Promise.all([
-        api('/api/catalog?kind=movies&page=1&limit=60'),
-        api('/api/catalog?kind=series&page=1&limit=30'),
-        api('/api/catalog?kind=live&page=1&limit=120')
+        api('/api/catalog?kind=movies&page=1&limit=60&sort=recent'),
+        api('/api/catalog?kind=series&page=1&limit=30&sort=recent'),
+        api('/api/catalog?kind=live&page=1&limit=120&sort=recent')
       ]);
       const ms=arr(movies.items), ss=arr(series.items), ls=arr(live.items);
       spotlight=ms.filter(x=>image(x)).sort((a,b)=>added(b)-added(a)||rating(b)-rating(a)).slice(0,5);
       const sports=ls.filter(x=>/sport|sports|dazn|sky sport|bein|beinsports|canal\+ sport|espn|ssc|eurosport|bundesliga|nba|nfl|mlb|nhl|ufc|wwe|dyn sport/i.test(name(x)+' '+cat(x))).slice(0,14);
       const countries={};ls.forEach(x=>{const c=cat(x).split('➾')[0].replace(/^.*?\b(?:DE|UK|FR|ES|IT|US|PT|TR|AR|NL|PL|GR|BE|CH|AT)\s*$/i,'').trim()||cat(x);if(c&&c.length<32)countries[c]=(countries[c]||0)+1});
-      const topCountries=Object.entries(countries).sort((a,b)=>b[1]-a[1]).slice(0,8);
+      const categoryRows=Array.isArray(live.categories)?live.categories.filter(x=>String(x.parent_id??0)==='0'&&String(x.category_id??'')!=='0'):[];const topCountries=(categoryRows.length?categoryRows.map(x=>[String(x.category_name||'').replace(/\s+/g,' ').trim(),ls.filter(y=>String(y.category_id||'')===String(x.category_id||'')).length]).filter(x=>x[0]):Object.entries(countries)).sort((a,b)=>b[1]-a[1]).slice(0,8);
       const newest=ms.slice().sort((a,b)=>added(b)-added(a)).slice(0,12);
       const topRated=ms.slice().sort((a,b)=>rating(b)-rating(a)).slice(0,12);
       const seriesNew=ss.slice().sort((a,b)=>added(b)-added(a)).slice(0,12);
-      sections.innerHTML=section('🔥 New Releases',newest,'movie')+section('🏆 Top Rated',topRated,'movie')+section('⚽ Sports',sports,'live')+section('📺 Series',seriesNew,'series')+(topCountries.length?'<section class="jh-section"><div class="jh-head"><h3>🌍 Countries</h3><span>Explore channels</span></div><div class="jh-country-row">'+topCountries.map(([c,n])=>'<button class="jh-country" data-jh-country="'+esc(c)+'"><strong>'+esc(c)+'</strong><small>'+n+' channels</small></button>').join('')+'</div></section>':'');
+      sections.innerHTML=section('🔥 New Releases',newest,'movie')+section('📺 Live TV',ls.slice(0,12),'live')+section('🏆 Top Rated',topRated,'movie')+section('⚽ Sports',sports,'live')+section('📺 Series',seriesNew,'series')+(topCountries.length?'<section class="jh-section"><div class="jh-head"><h3>🌍 Countries</h3><span>Explore channels</span></div><div class="jh-country-row">'+topCountries.map(([c,n])=>'<button class="jh-country" data-jh-country="'+esc(c)+'"><strong>'+esc(c)+'</strong><small>'+n+' channels</small></button>').join('')+'</div></section>':'');
       showSpot(0);clearInterval(timer);timer=setInterval(()=>showSpot(spot+1),3000);
       sections.querySelectorAll('.jh-card').forEach(b=>b.addEventListener('click',()=>{const tab=b.dataset.jhTab;const n=b.dataset.jhName;nav(tab);const s=document.getElementById('search');if(s){s.value=n;s.dispatchEvent(new Event('input',{bubbles:true))}}}));
       sections.querySelectorAll('[data-jh-country]').forEach(b=>b.onclick=()=>{nav('live');const c=document.getElementById('country');if(c){c.value=b.dataset.jhCountry;c.dispatchEvent(new Event('change',{bubbles:true}))}});
